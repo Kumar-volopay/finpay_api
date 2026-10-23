@@ -1,0 +1,22 @@
+
+# frozen_string_literal: true
+
+require "apartment"
+
+Apartment.configure do |config|
+  # Keep Company records in the public schema.
+  config.excluded_models = [ "Company" ]
+
+  # Use PostgreSQL schemas for tenant isolation.
+  config.use_schemas = true
+  config.use_sql = true
+
+  # Exclude Company table when cloning tenant schemas.
+  config.pg_exclude_clone_tables = true
+
+  # Keep the public schema accessible.
+  config.persistent_schemas = [ "public" ]
+
+  # Tenant schemas will be managed by application code.
+  config.tenant_names = []
+end

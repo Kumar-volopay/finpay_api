@@ -1,0 +1,47 @@
+# Ignore Bundler config
+/.bundle/
+
+# Ignore environment files and secrets
+/.env
+/.env*
+!.env.example
+
+# Ignore log files, but keep the placeholder
+/log/*
+!/log/.keep
+
+# Ignore temporary files, but keep the placeholder
+/tmp/*
+!/tmp/.keep
+
+# Ignore storage files, but keep the placeholder
+/storage/*
+!/storage/.keep
+
+# Ignore temporary storage
+/tmp/storage/*
+!/tmp/storage/
+!/tmp/storage/.keep
+
+# Ignore PID files, but keep the directory and placeholder
+/tmp/pids/*
+!/tmp/pids/
+!/tmp/pids/.keep
+
+# Ignore generated test coverage
+/coverage/
+
+# Ignore encryption key files
+/config/*.key
+
+# Ignore locally installed Bundler dependencies
+/vendor/bundle/
+
+# Ignore vendor dependencies and generated files
+/vendor/
+
+# Ignore generated logs, temporary files, and storage
+/log/
+/tmp/
+/storage/
+/.kamal/secrets
