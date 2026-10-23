@@ -7,7 +7,8 @@ on:
     branches: [main, master]
 
 jobs:
-  scan_ruby:
+  rubocop:
+    name: RuboCop
     runs-on: ubuntu-latest
 
     steps:
@@ -19,17 +20,12 @@ jobs:
         with:
           bundler-cache: true
 
-      - name: Scan for security vulnerabilities
-        run: bin/brakeman --no-pager
+      - name: Run RuboCop
+        run: bundle exec rubocop
 
-      - name: Audit gem dependencies
-        run: bin/bundler-audit check --update
-
-  lint:
+  brakeman:
+    name: Brakeman
     runs-on: ubuntu-latest
-
-    env:
-      RUBOCOP_CACHE_ROOT: tmp/rubocop
 
     steps:
       - name: Checkout code
@@ -40,26 +36,43 @@ jobs:
         with:
           bundler-cache: true
 
-      - name: Lint Ruby code
-        run: bin/rubocop -f github
+      - name: Run Brakeman
+        run: bundle exec brakeman --no-pager
 
-  test:
+  bundler-audit:
+    name: Bundler Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Run Bundler Audit
+        run: bundle exec bundler-audit check --update
+
+  rspec:
+    name: RSpec
     runs-on: ubuntu-latest
 
     services:
       postgres:
-        image: postgres
+        image: postgres:16
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: finpay_api_test
         ports:
-          - 5432:5432
+          - "5432:5432"
         options: >-
-          --health-cmd="pg_isready -U postgres"
-          --health-interval=10s
+          --health-cmd="pg_isready -U postgres -d finpay_api_test"
+          --health-interval=5s
           --health-timeout=5s
-          --health-retries=5
+          --health-retries=10
 
     steps:
       - name: Install system dependencies
@@ -79,9 +92,9 @@ jobs:
         env:
           RAILS_ENV: test
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/finpay_api_test
-        run: bin/rails db:prepare
+        run: bundle exec rails db:prepare
 
-      - name: Run RSpec tests
+      - name: Run RSpec
         env:
           RAILS_ENV: test
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/finpay_api_test
