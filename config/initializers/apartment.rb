@@ -18,5 +18,5 @@ Apartment.configure do |config|
   config.persistent_schemas = [ "public" ]
 
   # Tenant schemas will be managed by application code.
-  config.tenant_names = []
+  config.tenant_names = -> { Company.pluck(:subdomain) }
 end

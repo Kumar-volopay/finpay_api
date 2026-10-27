@@ -1,7 +1,10 @@
 
 require "rails_helper"
+require "securerandom"
 
 RSpec.describe Company, type: :model do
+  let(:subdomain) { "company_#{SecureRandom.hex(4)}" }
+
   describe "validations" do
     subject { build(:company) }
 
@@ -31,11 +34,45 @@ RSpec.describe Company, type: :model do
     end
 
     it "rejects duplicate subdomains" do
-      create(:company, subdomain: "acme")
-      duplicate = build(:company, subdomain: "acme")
+      create(:company, subdomain: subdomain)
+      duplicate = build(:company, subdomain: subdomain)
 
       expect(duplicate).not_to be_valid
       expect(duplicate.errors[:subdomain]).to include("has already been taken")
+    end
+
+    it "rejects reserved PostgreSQL schema names" do
+      %w[public pg_catalog information_schema pg_toast].each do |reserved_name|
+        company = build(:company, subdomain: reserved_name)
+
+        expect(company).not_to be_valid
+        expect(company.errors[:subdomain]).to include("is reserved")
+      end
+    end
+  end
+
+  describe "readonly attributes" do
+    it "does not allow the persisted subdomain to change" do
+      company = create(:company, subdomain: subdomain)
+
+      expect do
+        company.update!(subdomain: "newco")
+      end.to raise_error(ActiveRecord::ReadonlyAttributeError)
+
+      expect(company.reload.subdomain).to eq(subdomain)
+    end
+  end
+
+  describe "database schema" do
+    it "keeps the companies table in the public schema" do
+      schema = ActiveRecord::Base.connection.select_value(<<~SQL)
+        SELECT table_schema
+        FROM information_schema.tables
+        WHERE table_name = 'companies'
+          AND table_type = 'BASE TABLE'
+      SQL
+
+      expect(schema).to eq("public")
     end
   end
 end

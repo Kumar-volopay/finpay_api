@@ -7,6 +7,11 @@ gem "pg", "~> 1.1"
 # Use the Puma web server [https://github.com/puma/puma]
 gem "puma", ">= 5.0"
 
+
+# Provides Ruby's interface to native C libraries and functions.
+# Kept as an explicit dependency because win32-registry depends on Fiddle
+# on Windows; remove this declaration only if it is no longer required.
+
 gem "fiddle"
 
 # Build JSON APIs with ease [https://github.com/rails/jbuilder]
@@ -20,7 +25,6 @@ gem "tzinfo-data", platforms: %i[ windows jruby ]
 
 # Use the database-backed adapters for Rails.cache, Active Job, and Action Cable
 gem "solid_cache"
-gem "solid_queue"
 gem "solid_cable"
 
 # Reduces boot times through caching; required in config/boot.rb
@@ -58,6 +62,8 @@ group :development, :test do
   gem "faker"
 
   gem "simplecov", require: false
+
+  gem "dotenv-rails"
 end
 
 gem "ros-apartment", "~> 3.4", require: "apartment"

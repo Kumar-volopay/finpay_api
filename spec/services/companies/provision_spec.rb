@@ -3,10 +3,12 @@ require "rails_helper"
 
 RSpec.describe Companies::Provision do
   describe ".call" do
-    let(:name) { "Acme Corporation" }
-    let(:subdomain) { "acme" }
+    let(:name) { "Test Corporation" }
+    let(:subdomain) { tenant_subdomain("provision") }
 
     it "creates a company and its tenant schema" do
+      track_tenant_schema(subdomain)
+
       company = described_class.call(name: name, subdomain: subdomain)
 
       expect(company).to be_persisted
@@ -16,12 +18,6 @@ RSpec.describe Companies::Provision do
       expect(
         ActiveRecord::Base.connection.schema_exists?(subdomain)
       ).to be(true)
-    ensure
-      Apartment::Tenant.reset
-
-      if ActiveRecord::Base.connection.schema_exists?(subdomain)
-        Apartment::Tenant.drop(subdomain)
-      end
     end
 
     it "rejects a duplicate subdomain" do
@@ -36,6 +32,8 @@ RSpec.describe Companies::Provision do
     end
 
     it "rolls back the company and tenant schema if schema creation fails" do
+      track_tenant_schema(subdomain)
+
       allow(Apartment::Tenant).to receive(:create)
         .with(subdomain)
         .and_raise(StandardError, "Schema creation failed")
@@ -54,14 +52,13 @@ RSpec.describe Companies::Provision do
     end
 
     it "rolls back the company and schema if a later operation fails" do
-      schema_name = "rollback_check"
+      schema_name = tenant_subdomain("rollback")
+      track_tenant_schema(schema_name)
+
       original_create = Apartment::Tenant.method(:create)
-      schema_creation_attempted = false
 
       allow(Apartment::Tenant).to receive(:create).with(schema_name) do |tenant|
         original_create.call(tenant)
-        schema_creation_attempted = true
-
         raise StandardError, "Failure after schema creation"
       end
 
@@ -82,13 +79,6 @@ RSpec.describe Companies::Provision do
       expect(
         ActiveRecord::Base.connection.schema_exists?(schema_name)
       ).to be(false)
-    ensure
-      Apartment::Tenant.reset
-
-      if schema_creation_attempted &&
-         ActiveRecord::Base.connection.schema_exists?(schema_name)
-        Apartment::Tenant.drop(schema_name)
-      end
     end
   end
 end
