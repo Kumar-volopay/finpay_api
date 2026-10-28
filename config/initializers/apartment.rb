@@ -1,11 +1,13 @@
-
 # frozen_string_literal: true
 
 require "apartment"
 
 Apartment.configure do |config|
-  # Keep Company records in the public schema.
-  config.excluded_models = [ "Company" ]
+  # Keep Company and JwtDenylist records in the public schema.
+  config.excluded_models = [
+    "Company",
+    "JwtDenylist"
+  ]
 
   # Use PostgreSQL schemas for tenant isolation.
   config.use_schemas = true
