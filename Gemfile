@@ -79,4 +79,3 @@ gem "pundit", "~> 2.5"
 gem "strong_migrations", "~> 2.8"
 
 gem "alba", "~> 4.0"
-
