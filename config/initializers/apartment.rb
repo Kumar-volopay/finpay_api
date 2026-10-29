@@ -13,7 +13,7 @@ Apartment.configure do |config|
   config.use_schemas = true
   config.use_sql = true
 
-  # Exclude Company table when cloning tenant schemas.
+  # Exclude configured models from tenant schema cloning.
   config.pg_exclude_clone_tables = true
 
   # Keep the public schema accessible.
