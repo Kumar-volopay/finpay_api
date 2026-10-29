@@ -1,4 +1,3 @@
-
 class Company < ApplicationRecord
   RESERVED_SUBDOMAINS = %w[
     public

@@ -3,11 +3,9 @@ name: CI
 
 on:
   pull_request:
-  push:
     branches:
       - main
       - master
-      - 'feature/**'
 
 jobs:
   rubocop:
