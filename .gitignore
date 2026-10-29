@@ -1,3 +1,4 @@
+
 # Ignore Bundler config
 /.bundle/
 
@@ -44,4 +45,9 @@
 /log/
 /tmp/
 /storage/
+
+# Ignore Kamal secrets
 /.kamal/secrets
+
+# Ignore generated RSpec example status
+/spec/examples.txt
