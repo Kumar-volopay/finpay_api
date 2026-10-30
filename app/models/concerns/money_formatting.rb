@@ -1,3 +1,5 @@
+
+
 # frozen_string_literal: true
 
 require "bigdecimal"
@@ -30,6 +32,19 @@ module MoneyFormatting
     end
 
     scaled.to_i
+  rescue TypeError, ArgumentError => e
+    raise e if e.message.start_with?("Currency", "Amount")
+
+    raise ArgumentError, "Invalid monetary amount"
+  end
+
+  def self.round_to_minor_units(amount, currency:)
+    digits = fraction_digits(currency)
+    decimal = BigDecimal(amount.to_s)
+
+    raise ArgumentError, "Amount must be positive" unless decimal.positive?
+
+    (decimal * (10**digits)).round(0, :half_up).to_i
   rescue TypeError, ArgumentError => e
     raise e if e.message.start_with?("Currency", "Amount")
 

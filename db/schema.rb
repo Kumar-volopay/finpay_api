@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_29_112343) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_30_122145) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -59,9 +59,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_29_112343) do
 
   create_table "receipts", force: :cascade do |t|
     t.bigint "expense_id", null: false
-    t.string "file_name"
-    t.string "content_type"
-    t.bigint "byte_size"
+    t.string "file_name", null: false
+    t.string "content_type", null: false
+    t.bigint "byte_size", null: false
     t.string "storage_key", null: false
     t.string "ocr_status", default: "pending", null: false
     t.text "ocr_text"
@@ -69,6 +69,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_29_112343) do
     t.datetime "updated_at", null: false
     t.index ["expense_id"], name: "index_receipts_on_expense_id"
     t.check_constraint "byte_size IS NULL OR byte_size >= 0", name: "receipts_byte_size_nonnegative"
+    t.check_constraint "file_name IS NOT NULL AND content_type IS NOT NULL AND byte_size IS NOT NULL", name: "receipts_metadata_not_null"
     t.check_constraint "length(TRIM(BOTH FROM storage_key)) > 0", name: "receipts_storage_key_not_blank"
   end
 

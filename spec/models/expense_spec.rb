@@ -9,6 +9,18 @@ RSpec.describe Expense do
     expect(expense).to be_valid
   end
 
+  it "belongs to a user" do
+    expect(described_class.reflect_on_association(:user).macro).to eq(:belongs_to)
+  end
+
+  it "belongs to a category" do
+    expect(described_class.reflect_on_association(:category).macro).to eq(:belongs_to)
+  end
+
+  it "has many receipts" do
+    expect(described_class.reflect_on_association(:receipts).macro).to eq(:has_many)
+  end
+
   it "requires a title" do
     expense.title = nil
     expect(expense).not_to be_valid
@@ -20,10 +32,18 @@ RSpec.describe Expense do
 
     expense.amount_cents = -100
     expect(expense).not_to be_valid
+
+    expense.amount_cents = 100.5
+    expect(expense).not_to be_valid
   end
 
   it "requires an uppercase three-letter currency" do
     expense.currency = "usd"
+    expect(expense).not_to be_valid
+  end
+
+  it "requires an incurred date" do
+    expense.incurred_on = nil
     expect(expense).not_to be_valid
   end
 
@@ -32,14 +52,39 @@ RSpec.describe Expense do
     expect(expense).to be_valid
   end
 
-  it "filters expenses by user" do
-    expect(described_class).to respond_to(:for_user)
+  it "rejects an invalid status" do
+    expense.status = "invalid"
+
+    expect(expense).not_to be_valid
+    expect(expense.errors[:status]).to be_present
   end
 
-  it "encrypts notes" do
-    expense.notes = "Private notes"
+  it "filters expenses by user" do
+    user = create(:user)
+    another_user = create(:user)
+    category = create(:category)
 
-    expect(expense.notes).to eq("Private notes")
-    expect(expense.class.encrypted_attributes).to include(:notes)
+    user_expense = create(:expense, user: user, category: category)
+    create(:expense, user: another_user, category: category)
+
+    expect(described_class.for_user(user.id)).to contain_exactly(user_expense)
+  end
+
+  it "formats the amount as a decimal string" do
+    expense.amount_cents = 1234
+    expense.currency = "USD"
+
+    expect(expense.amount_decimal).to eq("12.34")
+  end
+
+  it "encrypts notes in the database" do
+    expense = create(:expense, notes: "Private notes")
+
+    stored_value = Expense.connection.select_value(
+      "SELECT notes FROM expenses WHERE id = #{Expense.connection.quote(expense.id)}"
+    )
+
+    expect(stored_value).not_to eq("Private notes")
+    expect(expense.reload.notes).to eq("Private notes")
   end
 end

@@ -12,8 +12,14 @@ class Receipt < ApplicationRecord
     failed: "failed"
   }, validate: true
 
+  validates :file_name, presence: true
+  validates :content_type, presence: true
   validates :storage_key, presence: true
+
   validates :byte_size,
-            numericality: { only_integer: true, greater_than_or_equal_to: 0 },
-            allow_nil: true
+            presence: true,
+            numericality: {
+              only_integer: true,
+              greater_than_or_equal_to: 0
+            }
 end
