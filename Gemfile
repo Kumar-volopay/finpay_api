@@ -37,7 +37,7 @@ gem "kamal", require: false
 gem "thruster", require: false
 
 # Use Active Storage variants [https://guides.rubyonrails.org/active_storage_overview.html#transforming-images]
-gem "image_processing", "~> 1.2"
+# gem "image_processing", "~> 1.2"
 
 # Use Rack CORS for handling Cross-Origin Resource Sharing (CORS), making cross-origin Ajax possible
 # gem "rack-cors"
@@ -69,3 +69,13 @@ end
 gem "ros-apartment", "~> 3.4", require: "apartment"
 
 ruby "4.0.7"
+
+gem "devise", "~> 5.0"
+
+gem "devise-jwt", "~> 0.13.0"
+
+gem "pundit", "~> 2.5"
+
+gem "strong_migrations", "~> 2.8"
+
+gem "alba", "~> 4.0"
