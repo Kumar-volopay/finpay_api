@@ -51,4 +51,22 @@ RSpec.describe MoneyFormatting do
         .to raise_error(ArgumentError)
     end
   end
+
+  describe ".round_to_minor_units" do
+    it "rounds half up for USD" do
+      expect(described_class.round_to_minor_units("1.005", currency: "USD")).to eq(101)
+    end
+
+    it "rounds half up for JPY" do
+      expect(described_class.round_to_minor_units("1.5", currency: "JPY")).to eq(2)
+    end
+
+    it "rejects zero and negative amounts" do
+      expect { described_class.round_to_minor_units("0", currency: "USD") }
+        .to raise_error(ArgumentError)
+
+      expect { described_class.round_to_minor_units("-1", currency: "USD") }
+        .to raise_error(ArgumentError)
+    end
+  end
 end
