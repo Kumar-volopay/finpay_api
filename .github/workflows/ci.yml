@@ -1,13 +1,10 @@
-
 name: CI
 
 on:
   pull_request:
-  push:
     branches:
       - main
       - master
-      - 'feature/**'
 
 jobs:
   rubocop:
@@ -62,6 +59,13 @@ jobs:
     name: RSpec
     runs-on: ubuntu-latest
 
+    env:
+      RAILS_ENV: test
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/finpay_api_test
+      ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY: ${{ secrets.ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY }}
+      ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY: ${{ secrets.ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY }}
+      ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT: ${{ secrets.ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT }}
+
     services:
       postgres:
         image: postgres:16
@@ -92,13 +96,7 @@ jobs:
           bundler-cache: true
 
       - name: Prepare test database
-        env:
-          RAILS_ENV: test
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/finpay_api_test
         run: bundle exec rails db:prepare
 
       - name: Run RSpec
-        env:
-          RAILS_ENV: test
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/finpay_api_test
         run: bundle exec rspec

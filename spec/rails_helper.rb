@@ -1,4 +1,3 @@
-
 require 'spec_helper'
 
 ENV['RAILS_ENV'] ||= 'test'
@@ -32,4 +31,21 @@ RSpec.configure do |config|
   config.infer_spec_type_from_file_location!
 
   config.filter_rails_from_backtrace!
+
+  # Bullet integration
+  config.before(:each) do
+    Bullet.start_request
+  end
+
+  config.after(:each) do |example|
+    begin
+      # Skip raising Bullet notifications only for the test
+      # that deliberately checks N+1 detection.
+      unless example.metadata[:bullet_n_plus_one_expected]
+        Bullet.perform_out_of_channel_notifications if Bullet.notification?
+      end
+    ensure
+      Bullet.end_request
+    end
+  end
 end

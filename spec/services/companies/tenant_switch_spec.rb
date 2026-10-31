@@ -1,4 +1,3 @@
-
 require "rails_helper"
 
 RSpec.describe "Company tenant switching" do
@@ -20,5 +19,32 @@ RSpec.describe "Company tenant switching" do
     end
 
     expect(Apartment::Tenant.current).to eq("public")
+  end
+
+  it "isolates category records between tenants" do
+    tenant_one = tenant_subdomain("tenant")
+    tenant_two = tenant_subdomain("tenant")
+
+    track_tenant_schema(tenant_one)
+    track_tenant_schema(tenant_two)
+
+    Apartment::Tenant.create(tenant_one)
+    Apartment::Tenant.create(tenant_two)
+
+    Apartment::Tenant.switch(tenant_one) do
+      Category.create!(name: "Food")
+    end
+
+    Apartment::Tenant.switch(tenant_two) do
+      Category.create!(name: "Travel")
+    end
+
+    Apartment::Tenant.switch(tenant_one) do
+      expect(Category.pluck(:name)).to eq([ "Food" ])
+    end
+
+    Apartment::Tenant.switch(tenant_two) do
+      expect(Category.pluck(:name)).to eq([ "Travel" ])
+    end
   end
 end
