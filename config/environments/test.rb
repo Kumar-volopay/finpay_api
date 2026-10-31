@@ -5,6 +5,12 @@
 
 Rails.application.configure do
   # Settings specified here will take precedence over those in config/application.rb.
+  config.after_initialize do
+    Bullet.enable = true
+    Bullet.bullet_logger = true
+    Bullet.raise = true
+    Bullet.n_plus_one_query_enable = true
+  end
 
   # While tests run files are not watched, reloading is not necessary.
   config.enable_reloading = false

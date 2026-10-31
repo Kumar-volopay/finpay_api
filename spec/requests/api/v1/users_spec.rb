@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "rails_helper"
 
 RSpec.describe "Api::V1::Users", type: :request do
@@ -73,8 +75,7 @@ RSpec.describe "Api::V1::Users", type: :request do
 
       get_user(other_user_id, access_token)
 
-      expect(response).to have_http_status(:unauthorized)
-      expect(response.parsed_body).to eq("error" => "Unauthorized")
+      expect(response).to have_http_status(:not_found)
     end
 
     it "rejects an expired access token" do

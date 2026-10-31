@@ -64,6 +64,8 @@ group :development, :test do
   gem "simplecov", require: false
 
   gem "dotenv-rails"
+
+  gem "bullet"
 end
 
 gem "ros-apartment", "~> 3.4", require: "apartment"
@@ -79,3 +81,5 @@ gem "pundit", "~> 2.5"
 gem "strong_migrations", "~> 2.8"
 
 gem "alba", "~> 4.0"
+
+gem "kaminari"

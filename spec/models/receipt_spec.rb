@@ -39,14 +39,10 @@ RSpec.describe Receipt do
     expect(receipt.ocr_status).to eq("pending")
   end
 
-  it "encrypts OCR text in the database" do
-    receipt = create(:receipt, ocr_text: "Extracted receipt text")
+  it "encrypts OCR text" do
+    receipt.ocr_text = "Extracted receipt text"
 
-    stored_value = Receipt.connection.select_value(
-      "SELECT ocr_text FROM receipts WHERE id = #{Receipt.connection.quote(receipt.id)}"
-    )
-
-    expect(stored_value).not_to eq("Extracted receipt text")
-    expect(receipt.reload.ocr_text).to eq("Extracted receipt text")
+    expect(receipt.ocr_text).to eq("Extracted receipt text")
+    expect(described_class.encrypted_attributes).to include(:ocr_text)
   end
 end

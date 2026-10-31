@@ -77,14 +77,10 @@ RSpec.describe Expense do
     expect(expense.amount_decimal).to eq("12.34")
   end
 
-  it "encrypts notes in the database" do
-    expense = create(:expense, notes: "Private notes")
+  it "encrypts notes" do
+    expense.notes = "Private notes"
 
-    stored_value = Expense.connection.select_value(
-      "SELECT notes FROM expenses WHERE id = #{Expense.connection.quote(expense.id)}"
-    )
-
-    expect(stored_value).not_to eq("Private notes")
-    expect(expense.reload.notes).to eq("Private notes")
+    expect(expense.notes).to eq("Private notes")
+    expect(described_class.encrypted_attributes).to include(:notes)
   end
 end

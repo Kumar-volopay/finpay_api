@@ -21,6 +21,7 @@ RSpec.describe Category do
 
   it "rejects a duplicate name" do
     create(:category, name: "Food")
+
     duplicate = build(:category, name: "Food")
 
     expect(duplicate).not_to be_valid

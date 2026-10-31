@@ -1,4 +1,3 @@
-
 require "rails_helper"
 
 RSpec.describe "Company tenant switching" do
