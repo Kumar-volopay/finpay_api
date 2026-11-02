@@ -66,7 +66,6 @@ group :development, :test do
   gem "dotenv-rails"
 
   gem "bullet"
-
 end
 
 gem "ros-apartment", "~> 3.4", require: "apartment"
