@@ -9,6 +9,4 @@ class ExpenseSerializer
   attribute :amount do |expense|
     expense.amount_decimal
   end
-
-
 end
