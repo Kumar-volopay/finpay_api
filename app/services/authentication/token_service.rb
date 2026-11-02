@@ -16,20 +16,23 @@ module Authentication
         exp: now + ACCESS_TOKEN_TTL
       }
 
-      JWT.encode(
-        payload,
-        Rails.application.secret_key_base,
-        "HS256"
-      )
+      JWT.encode(payload, jwt_secret, "HS256")
     end
 
     def self.decode(token)
       JWT.decode(
         token,
-        Rails.application.secret_key_base,
+        jwt_secret,
         true,
         algorithm: "HS256"
       ).first
     end
+
+    def self.jwt_secret
+      Rails.application.credentials.dig(:jwt, :secret_key).presence ||
+        raise("JWT secret is missing from Rails credentials")
+    end
+
+    private_class_method :jwt_secret
   end
 end

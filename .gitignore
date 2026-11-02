@@ -41,10 +41,6 @@
 # Ignore vendor dependencies and generated files
 /vendor/
 
-# Ignore generated logs, temporary files, and storage
-/log/
-/tmp/
-/storage/
 
 # Ignore Kamal secrets
 /.kamal/secrets

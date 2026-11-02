@@ -1,4 +1,6 @@
 class Company < ApplicationRecord
+  self.table_name = "public.companies"
+
   RESERVED_SUBDOMAINS = %w[
     public
     pg_catalog

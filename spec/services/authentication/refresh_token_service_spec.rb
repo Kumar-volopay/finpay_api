@@ -26,14 +26,15 @@ RSpec.describe Authentication::RefreshTokenService do
   let(:raw_token) { "test-refresh-token-123" }
   let(:token_digest) { Digest::SHA256.hexdigest(raw_token) }
 
-  def create_refresh_token(expires_at: 1.day.from_now, revoked_at: nil)
+  def create_refresh_token(expires_at: 1.day.from_now, revoked_at: nil, family_id: SecureRandom.uuid)
     Apartment::Tenant.switch(company.subdomain) do
       create(
         :refresh_token,
         user: user,
         token_digest: token_digest,
         expires_at: expires_at,
-        revoked_at: revoked_at
+        revoked_at: revoked_at,
+        family_id: family_id
       )
     end
   end

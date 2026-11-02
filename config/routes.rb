@@ -7,6 +7,7 @@ Rails.application.routes.draw do
       post "auth/login", to: "auth#login"
       delete "auth/logout", to: "auth#logout"
       post "auth/refresh", to: "auth#refresh"
+      post "invitations", to: "invitations#create"
 
       get "protected", to: "protected#index"
       get "users/:id", to: "users#show"

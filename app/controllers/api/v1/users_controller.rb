@@ -4,7 +4,8 @@ module Api
       include TenantLoader
 
       def show
-        user = User.find(params[:id])
+        user = policy_scope(User).find(params[:id])
+
         authorize user, :show?
 
         render json: {

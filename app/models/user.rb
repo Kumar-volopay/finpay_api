@@ -14,9 +14,19 @@ class User < ApplicationRecord
 
   validates :email,
             presence: true,
-            uniqueness: { case_sensitive: false }
+            uniqueness: { case_sensitive: false },
+            format: { with: URI::MailTo::EMAIL_REGEXP }
+
+  validates :password,
+            presence: true,
+            length: { minimum: 12 },
+            if: -> { new_record? || password.present? }
 
   validates :jti, presence: true, uniqueness: true
+
+  def disabled?
+    disabled_at.present?
+  end
 
   private
 
