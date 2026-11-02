@@ -30,7 +30,7 @@ class CreateExpenses < ActiveRecord::Migration[8.1]
                          "status IN ('pending', 'approved', 'rejected')",
                          name: "expenses_status_valid"
 
-    add_index :expenses, [:user_id, :incurred_on]
-    add_index :expenses, [:user_id, :status]
+    add_index :expenses, [ :user_id, :incurred_on ]
+    add_index :expenses, [ :user_id, :status ]
   end
 end

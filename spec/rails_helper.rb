@@ -41,5 +41,4 @@ RSpec.configure do |config|
   config.after(:each) do
     Bullet.end_request
   end
-
 end
