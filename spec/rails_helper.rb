@@ -32,4 +32,14 @@ RSpec.configure do |config|
   config.infer_spec_type_from_file_location!
 
   config.filter_rails_from_backtrace!
+
+  config.before(:each) do
+    Rails.cache.clear
+    Bullet.start_request
+  end
+
+  config.after(:each) do
+    Bullet.end_request
+  end
+
 end
