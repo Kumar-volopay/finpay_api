@@ -13,13 +13,17 @@ class Receipt < ApplicationRecord
   }, validate: true
 
   validates :file_name, presence: true
-  validates :content_type, presence: true
-  validates :storage_key, presence: true
+  validates :content_type,
+            presence: true,
+            inclusion: { in: %w[application/pdf image/jpeg image/png] }
+  validates :storage_key, presence: true, uniqueness: true
 
   validates :byte_size,
             presence: true,
             numericality: {
               only_integer: true,
-              greater_than_or_equal_to: 0
+              greater_than_or_equal_to: 0,
+              less_than_or_equal_to: 10.megabytes,
+              allow_nil: true
             }
 end

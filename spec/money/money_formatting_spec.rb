@@ -16,6 +16,18 @@ RSpec.describe MoneyFormatting do
       expect(described_class.fraction_digits("KWD")).to eq(3)
     end
 
+    it "returns zero decimal places for all zero-decimal currencies" do
+      %w[VND CLP ISK UGX XOF XAF PYG].each do |currency|
+        expect(described_class.fraction_digits(currency)).to eq(0)
+      end
+    end
+
+    it "returns three decimal places for all three-decimal currencies" do
+      %w[JOD TND LYD IQD].each do |currency|
+        expect(described_class.fraction_digits(currency)).to eq(3)
+      end
+    end
+
     it "rejects invalid currency codes" do
       expect { described_class.fraction_digits("usd") }
         .to raise_error(ArgumentError)
@@ -43,6 +55,11 @@ RSpec.describe MoneyFormatting do
         .to raise_error(ArgumentError)
     end
 
+    it "raises InvalidAmount for invalid monetary input" do
+      expect { described_class.to_minor_units("invalid", currency: "USD") }
+        .to raise_error(MoneyFormatting::InvalidAmount, "Invalid monetary amount")
+    end
+
     it "rejects zero and negative amounts" do
       expect { described_class.to_minor_units("0", currency: "USD") }
         .to raise_error(ArgumentError)
@@ -59,6 +76,17 @@ RSpec.describe MoneyFormatting do
 
     it "rounds half up for JPY" do
       expect(described_class.round_to_minor_units("1.5", currency: "JPY")).to eq(2)
+    end
+
+    it "rejects amounts that round down to zero minor units" do
+      expect {
+        described_class.round_to_minor_units("0.004", currency: "USD")
+      }.to raise_error(ArgumentError, "Amount must be positive after rounding")
+    end
+
+    it "raises InvalidAmount for invalid monetary input" do
+      expect { described_class.round_to_minor_units("invalid", currency: "USD") }
+        .to raise_error(MoneyFormatting::InvalidAmount, "Invalid monetary amount")
     end
 
     it "rejects zero and negative amounts" do

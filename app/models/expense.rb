@@ -3,7 +3,7 @@
 class Expense < ApplicationRecord
   belongs_to :user
   belongs_to :category
-  has_many :receipts, dependent: :destroy
+  has_many :receipts, dependent: :destroy, inverse_of: :expense
 
   encrypts :notes
 
@@ -13,7 +13,7 @@ class Expense < ApplicationRecord
     rejected: "rejected"
   }, validate: true
 
-  validates :title, presence: true
+  validates :title, presence: true, length: { maximum: 255 }
   validates :amount_cents,
             numericality: { only_integer: true, greater_than: 0 }
   validates :currency,
@@ -26,6 +26,10 @@ class Expense < ApplicationRecord
     return if amount_cents.nil? || currency.blank?
 
     digits = MoneyFormatting.fraction_digits(currency)
-    format("%.#{digits}f", amount_cents.to_d / (10**digits))
+    whole, fraction = amount_cents.divmod(10**digits)
+
+    return whole.to_s if digits.zero?
+
+    "#{whole}.#{fraction.to_s.rjust(digits, '0')}"
   end
 end

@@ -67,15 +67,11 @@ group :development, :test do
 end
 
 gem "ros-apartment", "~> 3.4", require: "apartment"
+gem "strong_migrations", "~> 2.8"
+gem "alba", "~> 4.0"
 
 ruby "4.0.7"
 
 gem "devise", "~> 5.0"
-
 gem "devise-jwt", "~> 0.13.0"
-
 gem "pundit", "~> 2.5"
-
-gem "strong_migrations", "~> 2.8"
-
-gem "alba", "~> 4.0"

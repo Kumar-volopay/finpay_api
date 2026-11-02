@@ -6,7 +6,9 @@ class CreateCategories < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :categories, :name, unique: true
+    add_index :categories, "LOWER(name)",
+              unique: true,
+              name: "index_categories_on_lower_name"
 
     add_check_constraint :categories,
                          "length(trim(name)) > 0",

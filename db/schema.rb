@@ -18,7 +18,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_02_074347) do
     t.string "name", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["name"], name: "index_categories_on_name", unique: true
+    t.index "lower((name)::text)", name: "index_categories_on_lower_name", unique: true
     t.check_constraint "length(TRIM(BOTH FROM name)) > 0", name: "categories_name_not_blank"
   end
 
@@ -42,13 +42,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_02_074347) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["category_id"], name: "index_expenses_on_category_id"
-    t.index ["incurred_on"], name: "index_expenses_on_incurred_on"
-    t.index ["status"], name: "index_expenses_on_status"
-    t.index ["user_id", "status", "incurred_on"], name: "index_expenses_on_user_status_incurred"
+    t.index ["user_id", "incurred_on"], name: "index_expenses_on_user_id_and_incurred_on"
+    t.index ["user_id", "status"], name: "index_expenses_on_user_id_and_status"
     t.index ["user_id"], name: "index_expenses_on_user_id"
     t.check_constraint "amount_cents > 0", name: "expenses_amount_cents_positive"
     t.check_constraint "currency::text ~ '^[A-Z]{3}$'::text", name: "expenses_currency_format"
     t.check_constraint "length(TRIM(BOTH FROM title)) > 0", name: "expenses_title_not_blank"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'approved'::character varying, 'rejected'::character varying]::text[])", name: "expenses_status_valid"
   end
 
   create_table "invitations", force: :cascade do |t|
@@ -83,9 +83,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_02_074347) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["expense_id"], name: "index_receipts_on_expense_id"
-    t.check_constraint "byte_size IS NULL OR byte_size >= 0", name: "receipts_byte_size_nonnegative"
-    t.check_constraint "file_name IS NOT NULL AND content_type IS NOT NULL AND byte_size IS NOT NULL", name: "receipts_metadata_not_null"
+    t.index ["storage_key"], name: "index_receipts_on_storage_key", unique: true
+    t.check_constraint "byte_size >= 0", name: "receipts_byte_size_nonnegative"
     t.check_constraint "length(TRIM(BOTH FROM storage_key)) > 0", name: "receipts_storage_key_not_blank"
+    t.check_constraint "ocr_status::text = ANY (ARRAY['pending'::character varying, 'processing'::character varying, 'completed'::character varying, 'failed'::character varying]::text[])", name: "receipts_ocr_status_valid"
   end
 
   create_table "refresh_tokens", force: :cascade do |t|

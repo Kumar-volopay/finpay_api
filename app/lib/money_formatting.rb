@@ -1,12 +1,16 @@
-
-
 # frozen_string_literal: true
 
 require "bigdecimal"
 
 module MoneyFormatting
-  CURRENCIES_WITH_ZERO_DECIMALS = %w[JPY KRW].freeze
-  CURRENCIES_WITH_THREE_DECIMALS = %w[BHD KWD OMR].freeze
+  class InvalidAmount < ArgumentError; end
+
+  CURRENCIES_WITH_ZERO_DECIMALS = %w[
+    JPY KRW VND CLP ISK UGX XOF XAF PYG
+  ].freeze
+  CURRENCIES_WITH_THREE_DECIMALS = %w[
+    BHD KWD OMR JOD TND LYD IQD
+  ].freeze
 
   def self.fraction_digits(currency)
     raise ArgumentError, "Currency must be a three-letter uppercase code" unless
@@ -21,7 +25,13 @@ module MoneyFormatting
 
   def self.to_minor_units(amount, currency:)
     digits = fraction_digits(currency)
-    decimal = BigDecimal(amount.to_s)
+    decimal =
+      begin
+        BigDecimal(amount.to_s)
+      rescue ArgumentError, TypeError
+        raise InvalidAmount, "Invalid monetary amount"
+      end
+    raise ArgumentError, "Amount must be finite" unless decimal.finite?
 
     raise ArgumentError, "Amount must be positive" unless decimal.positive?
 
@@ -32,22 +42,23 @@ module MoneyFormatting
     end
 
     scaled.to_i
-  rescue TypeError, ArgumentError => e
-    raise e if e.message.start_with?("Currency", "Amount")
-
-    raise ArgumentError, "Invalid monetary amount"
   end
 
   def self.round_to_minor_units(amount, currency:)
     digits = fraction_digits(currency)
-    decimal = BigDecimal(amount.to_s)
+    decimal =
+      begin
+        BigDecimal(amount.to_s)
+      rescue ArgumentError, TypeError
+        raise InvalidAmount, "Invalid monetary amount"
+      end
+    raise ArgumentError, "Amount must be finite" unless decimal.finite?
 
     raise ArgumentError, "Amount must be positive" unless decimal.positive?
 
-    (decimal * (10**digits)).round(0, :half_up).to_i
-  rescue TypeError, ArgumentError => e
-    raise e if e.message.start_with?("Currency", "Amount")
+    rounded = (decimal * (10**digits)).round(0, :half_up).to_i
+    raise ArgumentError, "Amount must be positive after rounding" unless rounded.positive?
 
-    raise ArgumentError, "Invalid monetary amount"
+    rounded
   end
 end

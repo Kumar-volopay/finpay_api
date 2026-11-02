@@ -26,7 +26,11 @@ class CreateExpenses < ActiveRecord::Migration[8.1]
                          "length(trim(title)) > 0",
                          name: "expenses_title_not_blank"
 
-    add_index :expenses, :status
-    add_index :expenses, :incurred_on
+    add_check_constraint :expenses,
+                         "status IN ('pending', 'approved', 'rejected')",
+                         name: "expenses_status_valid"
+
+    add_index :expenses, [:user_id, :incurred_on]
+    add_index :expenses, [:user_id, :status]
   end
 end
