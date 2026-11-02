@@ -87,4 +87,47 @@ RSpec.describe Expense do
     expect(stored_value).not_to eq("Private notes")
     expect(expense.reload.notes).to eq("Private notes")
   end
+
+  describe "AASM workflow transitions" do
+    it "starts in the pending state" do
+      expect(expense).to be_pending
+      expect(expense.pending?).to be(true)
+    end
+
+    it "transitions from pending to approved" do
+      expense.approve!
+      expect(expense).to be_approved
+    end
+
+    it "transitions from pending to rejected" do
+      expense.reject!
+      expect(expense).to be_rejected
+    end
+
+    it "transitions from approved to reimbursed" do
+      expense.status = :approved
+      expense.reimburse!
+      expect(expense).to be_reimbursed
+    end
+
+    it "transitions from reimbursed to archived" do
+      expense.status = :reimbursed
+      expense.archive!
+      expect(expense).to be_archived
+    end
+
+    it "does not approve an already approved expense" do
+      expense.status = :approved
+      expect { expense.approve! }.to raise_error(AASM::InvalidTransition)
+    end
+
+    it "does not reimburse a pending expense" do
+      expect { expense.reimburse! }.to raise_error(AASM::InvalidTransition)
+    end
+
+    it "does not archive a rejected expense" do
+      expense.status = :rejected
+      expect { expense.archive! }.to raise_error(AASM::InvalidTransition)
+    end
+  end
 end

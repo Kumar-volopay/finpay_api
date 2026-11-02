@@ -75,7 +75,44 @@ module Api
         head :no_content
       end
 
+      def approve
+        process_workflow(:approve)
+      end
+
+      def reject
+        process_workflow(:reject)
+      end
+
+      def reimburse
+        process_workflow(:reimburse)
+      end
+
       private
+      def process_workflow(action)
+        expense = policy_scope(Expense).find(params[:id])
+        authorize expense, "#{action}?".to_sym
+
+        fingerprint = Digest::SHA256.hexdigest(
+          [ action, params.except(:controller, :action, :id).to_unsafe_h.to_json ].join(":")
+        )
+
+        result = ExpenseWorkflowService.call(
+          expense: expense,
+          actor: @current_user,
+          action: action,
+          idempotency_key: request.headers["Idempotency-Key"],
+          request_fingerprint: fingerprint
+        )
+
+        if result.success?
+          render json: result.response_body,
+                 status: result.response_status || :ok
+        else
+          render json: { error: result.error },
+                 status: result.response_status || :unprocessable_entity
+        end
+      end
+
 
       def render_cursor_page(expenses, per_page)
         ordered_expenses = expenses

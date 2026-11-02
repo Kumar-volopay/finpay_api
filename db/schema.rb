@@ -10,9 +10,20 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_02_074347) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_02_161658) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "activity_logs", force: :cascade do |t|
+    t.bigint "expense_id", null: false
+    t.bigint "actor_id", null: false
+    t.string "action", null: false
+    t.string "from_state", null: false
+    t.string "to_state", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["expense_id", "created_at"], name: "index_activity_logs_on_expense_id_and_created_at"
+  end
 
   create_table "categories", force: :cascade do |t|
     t.string "name", null: false
@@ -41,6 +52,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_02_074347) do
     t.text "notes"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "approved_by_id"
+    t.datetime "approved_at"
+    t.bigint "rejected_by_id"
+    t.datetime "rejected_at"
+    t.bigint "reimbursed_by_id"
+    t.datetime "reimbursed_at"
     t.index ["category_id"], name: "index_expenses_on_category_id"
     t.index ["user_id", "incurred_on"], name: "index_expenses_on_user_id_and_incurred_on"
     t.index ["user_id", "status"], name: "index_expenses_on_user_id_and_status"
@@ -48,7 +65,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_02_074347) do
     t.check_constraint "amount_cents > 0", name: "expenses_amount_cents_positive"
     t.check_constraint "currency::text ~ '^[A-Z]{3}$'::text", name: "expenses_currency_format"
     t.check_constraint "length(TRIM(BOTH FROM title)) > 0", name: "expenses_title_not_blank"
-    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'approved'::character varying, 'rejected'::character varying]::text[])", name: "expenses_status_valid"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'approved'::character varying, 'rejected'::character varying, 'reimbursed'::character varying, 'archived'::character varying]::text[])", name: "expenses_status_valid"
+  end
+
+  create_table "idempotency_keys", force: :cascade do |t|
+    t.string "key", null: false
+    t.bigint "expense_id", null: false
+    t.string "request_fingerprint", null: false
+    t.integer "response_status"
+    t.jsonb "response_body"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["key"], name: "index_idempotency_keys_on_key", unique: true
   end
 
   create_table "invitations", force: :cascade do |t|
@@ -114,8 +142,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_02_074347) do
     t.index ["jti"], name: "index_users_on_jti", unique: true
   end
 
+  add_foreign_key "activity_logs", "expenses"
+  add_foreign_key "activity_logs", "users", column: "actor_id"
   add_foreign_key "expenses", "categories"
   add_foreign_key "expenses", "users"
+  add_foreign_key "expenses", "users", column: "approved_by_id"
+  add_foreign_key "expenses", "users", column: "reimbursed_by_id"
+  add_foreign_key "expenses", "users", column: "rejected_by_id"
+  add_foreign_key "idempotency_keys", "expenses"
   add_foreign_key "invitations", "users", column: "invited_by_id"
   add_foreign_key "receipts", "expenses"
   add_foreign_key "refresh_tokens", "users"
