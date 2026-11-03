@@ -23,6 +23,7 @@ module TenantLoader
 
       company = Company.find_by(id: company_id)
       raise ActiveRecord::RecordNotFound unless company
+      @current_company = company
 
     rescue JWT::DecodeError, ActiveRecord::RecordNotFound
       render json: { error: "Unauthorized" }, status: :unauthorized

@@ -20,6 +20,8 @@ RSpec.describe ExpenseWorkflowService do
     end
 
     it "allows only one thread to approve the same expense" do
+      allow(AuditLogWorker).to receive(:perform_async)
+
       expense_record = expense
       admin_record = admin
 
@@ -35,6 +37,7 @@ RSpec.describe ExpenseWorkflowService do
 
             result = described_class.call(
               expense: Expense.find(expense_record.id),
+              company_id: 1,
               actor: User.find(admin_record.id),
               action: :approve
             )
@@ -56,7 +59,7 @@ RSpec.describe ExpenseWorkflowService do
       expect(outcomes.count(true)).to eq(1)
       expect(outcomes.count(false)).to eq(1)
       expect(expense_record.reload).to be_approved
-      expect(ActivityLog.where(expense: expense_record).count).to eq(1)
+      expect(AuditLogWorker).to have_received(:perform_async).once
     ensure
       threads&.each { |thread| thread.kill if thread.alive? }
 

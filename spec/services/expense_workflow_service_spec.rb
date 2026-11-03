@@ -17,6 +17,7 @@ RSpec.describe ExpenseWorkflowService do
       it "approves a pending expense" do
         result = described_class.call(
           expense: expense,
+          company_id: 1,
           actor: admin,
           action: :approve
         )
@@ -27,21 +28,25 @@ RSpec.describe ExpenseWorkflowService do
         expect(expense.approved_at).to be_present
       end
 
-      it "creates an activity log" do
-        expect {
-          described_class.call(
-            expense: expense,
-            actor: admin,
-            action: :approve
-          )
-        }.to change(ActivityLog, :count).by(1)
+      it "enqueues an audit job for approval" do
+        expect(AuditLogWorker).to receive(:perform_async).with(
+          1,
+          expense.id,
+          admin.id,
+          "approve",
+          "pending",
+          "approved",
+          "expense:#{expense.id}:approve:v1"
+        ).once
 
-        log = ActivityLog.last
+        result = described_class.call(
+          expense: expense,
+          company_id: 1,
+          actor: admin,
+          action: :approve
+        )
 
-        expect(log.action).to eq("approve")
-        expect(log.from_state).to eq("pending")
-        expect(log.to_state).to eq("approved")
-        expect(log.actor).to eq(admin)
+        expect(result.success?).to be(true)
       end
     end
 
@@ -49,6 +54,7 @@ RSpec.describe ExpenseWorkflowService do
       it "rejects a pending expense" do
         result = described_class.call(
           expense: expense,
+          company_id: 1,
           actor: admin,
           action: :reject
         )
@@ -73,6 +79,7 @@ RSpec.describe ExpenseWorkflowService do
       it "reimburses an approved expense" do
         result = described_class.call(
           expense: approved_expense,
+          company_id: 1,
           actor: admin,
           action: :reimburse,
           idempotency_key: "reimburse-001",
@@ -88,6 +95,7 @@ RSpec.describe ExpenseWorkflowService do
       it "fails when the idempotency key is missing" do
         result = described_class.call(
           expense: approved_expense,
+          company_id: 1,
           actor: admin,
           action: :reimburse,
           request_fingerprint: "fingerprint-001"
@@ -99,8 +107,11 @@ RSpec.describe ExpenseWorkflowService do
       end
 
       it "replays the original response for the same request" do
+        allow(AuditLogWorker).to receive(:perform_async)
+
         first_result = described_class.call(
           expense: approved_expense,
+          company_id: 1,
           actor: admin,
           action: :reimburse,
           idempotency_key: "reimburse-002",
@@ -109,6 +120,7 @@ RSpec.describe ExpenseWorkflowService do
 
         second_result = described_class.call(
           expense: approved_expense,
+          company_id: 1,
           actor: admin,
           action: :reimburse,
           idempotency_key: "reimburse-002",
@@ -119,7 +131,7 @@ RSpec.describe ExpenseWorkflowService do
         expect(second_result.success?).to be(true)
         expect(second_result.replayed?).to be(true)
         expect(second_result.response_body).to eq("expense_id" => approved_expense.id, "status" => "reimbursed")
-        expect(ActivityLog.where(expense: approved_expense).count).to eq(1)
+        expect(AuditLogWorker).to have_received(:perform_async).once
       end
     end
 
@@ -134,6 +146,7 @@ RSpec.describe ExpenseWorkflowService do
 
         result = described_class.call(
           expense: approved_expense,
+          company_id: 1,
           actor: admin,
           action: :approve
         )
@@ -146,6 +159,7 @@ RSpec.describe ExpenseWorkflowService do
       it "does not reimburse a pending expense" do
         result = described_class.call(
           expense: expense,
+          company_id: 1,
           actor: admin,
           action: :reimburse,
           idempotency_key: "reimburse-003",
@@ -162,6 +176,7 @@ RSpec.describe ExpenseWorkflowService do
       it "returns a failure result" do
         result = described_class.call(
           expense: expense,
+          company_id: 1,
           actor: admin,
           action: :invalid_action
         )
@@ -171,23 +186,22 @@ RSpec.describe ExpenseWorkflowService do
       end
     end
 
-    context "when activity log creation fails" do
-      it "rolls back the expense status and actor timestamp" do
-        allow(ActivityLog).to receive(:create!).and_raise(
-          ActiveRecord::RecordInvalid.new(ActivityLog.new)
-        )
+    context "when the transaction rolls back" do
+      it "does not enqueue an audit job" do
+        allow(AuditLogWorker).to receive(:perform_async)
 
-        result = described_class.call(
-          expense: expense,
-          actor: admin,
-          action: :approve
-        )
+        ActiveRecord::Base.transaction(requires_new: true) do
+          described_class.call(
+            expense: expense,
+            company_id: 1,
+            actor: admin,
+            action: :approve
+          )
 
-        expect(result.success?).to be(false)
-        expect(expense.reload).to be_pending
-        expect(expense.approved_by_id).to be_nil
-        expect(expense.approved_at).to be_nil
-        expect(ActivityLog.where(expense: expense)).to be_empty
+          raise ActiveRecord::Rollback
+        end
+
+        expect(AuditLogWorker).not_to have_received(:perform_async)
       end
     end
   end

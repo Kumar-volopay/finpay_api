@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 class Receipt < ApplicationRecord
+  attr_accessor :ocr_company_id
+
   belongs_to :expense
 
   encrypts :ocr_text
@@ -13,9 +15,11 @@ class Receipt < ApplicationRecord
   }, validate: true
 
   validates :file_name, presence: true
+
   validates :content_type,
             presence: true,
             inclusion: { in: %w[application/pdf image/jpeg image/png] }
+
   validates :storage_key, presence: true, uniqueness: true
 
   validates :byte_size,
@@ -26,4 +30,17 @@ class Receipt < ApplicationRecord
               less_than_or_equal_to: 10.megabytes,
               allow_nil: true
             }
+
+  after_create_commit :enqueue_ocr_processing
+
+  private
+
+  def enqueue_ocr_processing
+    return unless ocr_company_id
+
+    ReceiptProcessorWorker.perform_async(
+      ocr_company_id,
+      id
+    )
+  end
 end

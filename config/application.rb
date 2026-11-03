@@ -28,5 +28,10 @@ module FinpayApi
     # Middleware like session, flash, cookies can be added back manually.
     # Skip views, helpers and assets when generating a new resource.
     config.api_only = true
+
+    # Enable cookie and session middleware for Sidekiq Web.
+    config.middleware.use ActionDispatch::Cookies
+    config.middleware.use ActionDispatch::Session::CookieStore,
+                          key: "_finpay_api_session"
   end
 end

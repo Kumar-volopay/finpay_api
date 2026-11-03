@@ -2,11 +2,17 @@
 
 class Expense < ApplicationRecord
   include AASM
+
+  attr_accessor :audit_company_id
+
+  after_create_commit :enqueue_creation_audit
+
   belongs_to :user
   belongs_to :approved_by, class_name: "User", optional: true
   belongs_to :rejected_by, class_name: "User", optional: true
   belongs_to :reimbursed_by, class_name: "User", optional: true
   belongs_to :category
+
   has_many :receipts, dependent: :destroy, inverse_of: :expense
   has_many :activity_logs, dependent: :restrict_with_error
   has_many :idempotency_keys, dependent: :restrict_with_error
@@ -38,7 +44,6 @@ class Expense < ApplicationRecord
 
   validates :status,
             inclusion: { in: %w[pending approved rejected reimbursed archived] }
-
   validates :title, presence: true, length: { maximum: 255 }
   validates :amount_cents,
             numericality: { only_integer: true, greater_than: 0 }
@@ -57,5 +62,18 @@ class Expense < ApplicationRecord
     return whole.to_s if digits.zero?
 
     "#{whole}.#{fraction.to_s.rjust(digits, '0')}"
+  end
+
+  private
+
+  def enqueue_creation_audit
+    return unless audit_company_id
+
+    AuditLogWorker.perform_async(
+      audit_company_id,
+      id,
+      user_id,
+      "expense:#{id}:created:v1"
+    )
   end
 end

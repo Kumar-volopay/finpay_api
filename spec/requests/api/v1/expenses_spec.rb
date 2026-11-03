@@ -182,6 +182,13 @@ RSpec.describe "Api::V1::Expenses", type: :request do
 
   describe "POST /api/v1/expenses" do
     it "creates an expense for the authenticated member" do
+      expect(AuditLogWorker).to receive(:perform_async).with(
+        company.id,
+        kind_of(Integer),
+        member.id,
+        match(/\Aexpense:\d+:created:v1\z/)
+      )
+
       expect {
         post "/api/v1/expenses",
              params: expense_params,
@@ -206,6 +213,24 @@ RSpec.describe "Api::V1::Expenses", type: :request do
       expect(response).to have_http_status(:created)
       expect(response.parsed_body["user_id"]).to eq(member.id)
       expect(response.parsed_body["status"]).to eq("pending")
+    end
+
+    it "does not enqueue an audit job when expense creation fails" do
+      expect(AuditLogWorker).not_to receive(:perform_async)
+
+      post "/api/v1/expenses",
+           params: {
+             expense: {
+               title: "",
+               amount_cents: 2500,
+               currency: "USD",
+               category_id: category.id,
+               incurred_on: Date.current
+             }
+           },
+           headers: headers
+
+      expect(response).to have_http_status(:unprocessable_entity)
     end
   end
 

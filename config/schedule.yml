@@ -1,0 +1,5 @@
+overdue_expense_reminders:
+  cron: "0 9 * * * Asia/Kolkata"
+  class: "OverdueReminderSchedulerWorker"
+  queue: critical
+  description: "Enqueue overdue expense reminders for all companies"

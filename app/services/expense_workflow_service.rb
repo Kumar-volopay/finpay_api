@@ -3,9 +3,10 @@
 class ExpenseWorkflowService < ApplicationService
   ACTIONS = %i[approve reject reimburse archive].freeze
 
-  def initialize(expense:, actor:, action:, idempotency_key: nil, request_fingerprint: nil, metadata: {})
+  def initialize(expense:, actor:, action:, company_id: nil, idempotency_key: nil, request_fingerprint: nil, metadata: {})
     @expense = expense
     @actor = actor
+    @company_id = company_id
     @action = action.to_sym
     @idempotency_key = idempotency_key
     @request_fingerprint = request_fingerprint
@@ -83,6 +84,11 @@ class ExpenseWorkflowService < ApplicationService
       )
     end
 
+    enqueue_audit_after_commit(
+      from_state: from_state,
+      to_state: @expense.status
+    )
+
     success(
       @expense,
       response_status: 200,
@@ -90,6 +96,25 @@ class ExpenseWorkflowService < ApplicationService
     )
   end
 
+  def enqueue_audit_after_commit(from_state:, to_state:)
+    company_id = @company_id
+    expense_id = @expense.id
+    actor_id = @actor.id
+    action = @action.to_s
+    event_key = "expense:#{expense_id}:#{action}:v1"
+
+    ActiveRecord.after_all_transactions_commit do
+      AuditLogWorker.perform_async(
+        company_id,
+        expense_id,
+        actor_id,
+        action,
+        from_state,
+        to_state,
+        event_key
+      )
+    end
+  end
 
   def reserve_idempotency_key
     IdempotencyService.call(

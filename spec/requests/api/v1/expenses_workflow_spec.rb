@@ -67,12 +67,6 @@ RSpec.describe "Api::V1::Expenses workflow", type: :request do
     end
   end
 
-  def tenant_activity_log_count(expense)
-    Apartment::Tenant.switch(company.subdomain) do
-      ActivityLog.where(expense_id: expense.id).count
-    end
-  end
-
   describe "POST /api/v1/expenses/:id/approve" do
     it "allows an admin to approve another member's expense" do
       expense = create_expense(member, category, "Approval expense")
@@ -87,8 +81,6 @@ RSpec.describe "Api::V1::Expenses workflow", type: :request do
         expect(expense.reload.approved_by_id).to eq(admin.id)
         expect(expense.approved_at).to be_present
       end
-
-      expect(tenant_activity_log_count(expense)).to eq(1)
     end
 
     it "replays the original approval response for the same request" do
@@ -143,8 +135,6 @@ RSpec.describe "Api::V1::Expenses workflow", type: :request do
         expect(expense.reload.rejected_by_id).to eq(admin.id)
         expect(expense.rejected_at).to be_present
       end
-
-      expect(tenant_activity_log_count(expense)).to eq(1)
     end
   end
 
@@ -182,8 +172,6 @@ RSpec.describe "Api::V1::Expenses workflow", type: :request do
         expect(expense.reload.reimbursed_by_id).to eq(admin.id)
         expect(expense.reimbursed_at).to be_present
       end
-
-      expect(tenant_activity_log_count(expense)).to eq(1)
     end
 
     it "returns the original response when the same request is replayed" do
@@ -208,7 +196,6 @@ RSpec.describe "Api::V1::Expenses workflow", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(response.parsed_body).to eq(first_response)
-      expect(tenant_activity_log_count(expense)).to eq(1)
     end
 
 
@@ -234,7 +221,6 @@ RSpec.describe "Api::V1::Expenses workflow", type: :request do
 
       Apartment::Tenant.switch(company.subdomain) do
         expect(second_expense.reload).to be_approved
-        expect(ActivityLog.where(expense: second_expense)).to be_empty
       end
     end
 
@@ -259,7 +245,6 @@ RSpec.describe "Api::V1::Expenses workflow", type: :request do
 
       Apartment::Tenant.switch(company.subdomain) do
         expect(expense.reload).to be_reimbursed
-        expect(ActivityLog.where(expense: expense).count).to eq(1)
       end
     end
 

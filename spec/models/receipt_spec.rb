@@ -49,4 +49,25 @@ RSpec.describe Receipt do
     expect(stored_value).not_to eq("Extracted receipt text")
     expect(receipt.reload.ocr_text).to eq("Extracted receipt text")
   end
+
+  describe "OCR processing callback" do
+    it "enqueues OCR processing after receipt creation" do
+      receipt = build(:receipt)
+      receipt.ocr_company_id = 1
+
+      expect(ReceiptProcessorWorker)
+        .to receive(:perform_async)
+        .with(1, kind_of(Integer))
+        .once
+
+      receipt.save!
+    end
+
+    it "does not enqueue OCR processing without a company ID" do
+      expect(ReceiptProcessorWorker)
+        .not_to receive(:perform_async)
+
+      create(:receipt)
+    end
+  end
 end
