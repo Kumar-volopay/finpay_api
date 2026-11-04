@@ -67,6 +67,12 @@ RSpec.describe "Api::V1::Expenses workflow", type: :request do
     end
   end
 
+  def tenant_activity_log_count(expense)
+    Apartment::Tenant.switch(company.subdomain) do
+      ActivityLog.where(expense_id: expense.id).count
+    end
+  end
+
   describe "POST /api/v1/expenses/:id/approve" do
     it "allows an admin to approve another member's expense" do
       expense = create_expense(member, category, "Approval expense")

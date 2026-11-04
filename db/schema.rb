@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_04_095355) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_04_120001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -27,10 +27,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_04_095355) do
     t.index ["actor_id"], name: "index_activity_logs_on_actor_id"
     t.index ["event_key"], name: "index_activity_logs_on_event_key", unique: true
     t.index ["expense_id", "created_at"], name: "index_activity_logs_on_expense_id_and_created_at"
+    t.check_constraint "action::text = ANY (ARRAY['create'::character varying, 'approve'::character varying, 'reject'::character varying, 'reimburse'::character varying, 'archive'::character varying]::text[])", name: "activity_logs_action_check"
+    t.check_constraint "from_state::text = ANY (ARRAY['new'::character varying, 'pending'::character varying, 'approved'::character varying, 'rejected'::character varying, 'reimbursed'::character varying, 'archived'::character varying]::text[])", name: "activity_logs_from_state_check"
   end
 
-  add_check_constraint "activity_logs", "action::text = ANY (ARRAY['approve'::character varying, 'reject'::character varying, 'reimburse'::character varying, 'archive'::character varying]::text[])", name: "activity_logs_action_check", validate: false
-  add_check_constraint "activity_logs", "from_state::text = ANY (ARRAY['pending'::character varying, 'approved'::character varying, 'rejected'::character varying, 'reimbursed'::character varying, 'archived'::character varying]::text[])", name: "activity_logs_from_state_check", validate: false
   add_check_constraint "activity_logs", "to_state::text = ANY (ARRAY['pending'::character varying, 'approved'::character varying, 'rejected'::character varying, 'reimbursed'::character varying, 'archived'::character varying]::text[])", name: "activity_logs_to_state_check", validate: false
 
   create_table "categories", force: :cascade do |t|
