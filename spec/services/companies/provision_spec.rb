@@ -20,6 +20,49 @@ RSpec.describe Companies::Provision do
       ).to be(true)
     end
 
+
+    it "creates authentication tables, indexes, and constraints in the tenant schema" do
+      track_tenant_schema(subdomain)
+
+      described_class.call(name: name, subdomain: subdomain)
+
+      connection = ActiveRecord::Base.connection
+      quoted_schema = connection.quote(subdomain)
+
+      tables = connection.select_values(<<~SQL)
+        SELECT tablename
+        FROM pg_tables
+        WHERE schemaname = #{quoted_schema}
+      SQL
+
+      expect(tables).to include("users", "refresh_tokens")
+
+      indexes = connection.select_values(<<~SQL)
+        SELECT indexname
+        FROM pg_indexes
+        WHERE schemaname = #{quoted_schema}
+          AND tablename IN ('users', 'refresh_tokens')
+      SQL
+
+      expect(indexes).to include(
+        "index_users_on_email",
+        "index_users_on_jti",
+        "index_refresh_tokens_on_token_digest",
+        "index_refresh_tokens_on_user_id"
+      )
+
+      columns = connection.select_rows(<<~SQL)
+        SELECT table_name, column_name, is_nullable
+        FROM information_schema.columns
+        WHERE table_schema = #{quoted_schema}
+          AND table_name = 'refresh_tokens'
+          AND column_name IN ('user_id', 'token_digest', 'expires_at')
+      SQL
+
+      expect(columns.size).to eq(3)
+      expect(columns.map(&:last).uniq).to eq([ "NO" ])
+    end
+
     it "rejects a duplicate subdomain" do
       create(:company, subdomain: subdomain)
 
