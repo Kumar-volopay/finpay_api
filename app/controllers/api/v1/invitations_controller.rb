@@ -1,1 +1,24 @@
-[ "module Api\n", "  module V1\n", "    class InvitationsController < ApplicationController\n", "      include TenantLoader\n", "\n", "      def create\n", "        authorize Invitation\n", "\n", "        invitation, raw_token = Authentication::InvitationService.create(\n", "          user: @current_user,\n", "          email: params[:email]\n", "        )\n", "\n", "        render json: {\n", "          invitation: {\n", "            email: invitation.email,\n", "            expires_at: invitation.expires_at\n", "          },\n", "          invitation_token: raw_token\n", "        }, status: :created\n", "      end\n", "    end\n", "  end\n", "end\n" ]
+module Api
+  module V1
+    class InvitationsController < ApplicationController
+      include TenantLoader
+
+      def create
+        authorize Invitation
+
+        invitation, raw_token = Authentication::InvitationService.create(
+          user: @current_user,
+          email: params[:email]
+        )
+
+        render json: {
+          invitation: {
+            email: invitation.email,
+            expires_at: invitation.expires_at
+          },
+          invitation_token: raw_token
+        }, status: :created
+      end
+    end
+  end
+end
