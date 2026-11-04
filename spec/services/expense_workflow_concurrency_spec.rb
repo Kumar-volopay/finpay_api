@@ -63,16 +63,29 @@ RSpec.describe ExpenseWorkflowService do
       if expense_record&.persisted?
         connection = ActiveRecord::Base.connection
 
-        begin
-          connection.execute(
-            "ALTER TABLE activity_logs DISABLE TRIGGER prevent_activity_log_mutation"
+        trigger_exists = connection.select_value(<<~SQL)
+          SELECT EXISTS (
+            SELECT 1
+            FROM pg_trigger
+            WHERE tgname = 'prevent_activity_log_mutation'
+              AND tgrelid = 'activity_logs'::regclass
+              AND NOT tgisinternal
           )
+        SQL
 
+        begin
+          if trigger_exists
+            connection.execute(
+              "ALTER TABLE activity_logs DISABLE TRIGGER prevent_activity_log_mutation"
+            )
+          end
           ActivityLog.where(expense: expense_record).delete_all
         ensure
-          connection.execute(
-            "ALTER TABLE activity_logs ENABLE TRIGGER prevent_activity_log_mutation"
-          )
+          if trigger_exists
+            connection.execute(
+              "ALTER TABLE activity_logs ENABLE TRIGGER prevent_activity_log_mutation"
+            )
+          end
         end
 
         Expense.where(id: expense_record.id).delete_all
