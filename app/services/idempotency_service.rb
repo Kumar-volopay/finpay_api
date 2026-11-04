@@ -23,11 +23,9 @@ class IdempotencyService < ApplicationService
       new_record.expires_at = 24.hours.from_now
     end
 
-    return failure("Idempotency key already used for another expense") if
-      record.expense_id != @expense.id
+    raise ApiErrors::IdempotencyConflict if record.expense_id != @expense.id
 
-    return failure("Idempotency key reused with different request") if
-      record.request_fingerprint != @fingerprint
+    raise ApiErrors::IdempotencyConflict if record.request_fingerprint != @fingerprint
 
     if record.previously_new_record?
       return success(record, record: record)

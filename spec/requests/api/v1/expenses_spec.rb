@@ -28,6 +28,20 @@ RSpec.describe "Api::V1::Expenses", type: :request do
 
   let(:category) { create_category }
 
+  def expect_standard_error_response(code:, message:)
+    body = response.parsed_body
+
+    expect(body.keys).to contain_exactly("error")
+    expect(body.fetch("error").keys)
+      .to contain_exactly("code", "message", "details")
+    expect(body.dig("error", "code")).to eq(code)
+    expect(body.dig("error", "message")).to eq(message)
+
+    expect(response.body).not_to match(
+      /SELECT\s+.*FROM|INSERT INTO|UPDATE\s+.*SET|PG::|ActiveRecord::|app\/.*\.rb:\d+/i
+    )
+  end
+
   let!(:own_expense) do
     create_expense(member, category, "My expense")
   end
@@ -103,7 +117,7 @@ RSpec.describe "Api::V1::Expenses", type: :request do
 
       expect(response).to have_http_status(:ok)
 
-      ids = response.parsed_body["expenses"].map do |expense|
+      ids = response.parsed_body["data"].map do |expense|
         expense["id"]
       end
 
@@ -116,7 +130,7 @@ RSpec.describe "Api::V1::Expenses", type: :request do
 
       expect(response).to have_http_status(:ok)
 
-      ids = response.parsed_body["expenses"].map do |expense|
+      ids = response.parsed_body["data"].map do |expense|
         expense["id"]
       end
 
@@ -126,7 +140,11 @@ RSpec.describe "Api::V1::Expenses", type: :request do
     it "rejects an unauthenticated request" do
       get "/api/v1/expenses"
 
-      expect(response).to have_http_status(:unauthorized)
+expect(response).to have_http_status(:unauthorized)
+expect_standard_error_response(
+  code: "unauthorized",
+  message: "Authentication required"
+)
     end
   end
 
@@ -135,13 +153,18 @@ RSpec.describe "Api::V1::Expenses", type: :request do
       get "/api/v1/expenses/#{own_expense.id}", headers: headers
 
       expect(response).to have_http_status(:ok)
-      expect(response.parsed_body["id"]).to eq(own_expense.id)
+      expect(response.parsed_body.dig("data", "id"))
+        .to eq(own_expense.id)
     end
 
     it "prevents a member from viewing another member's expense" do
       get "/api/v1/expenses/#{another_expense.id}", headers: headers
 
-      expect(response).to have_http_status(:not_found)
+expect(response).to have_http_status(:not_found)
+expect_standard_error_response(
+  code: "not_found",
+  message: "Resource not found"
+)
     end
 
     it "prevents a user from another tenant accessing this tenant's expense" do
@@ -196,8 +219,8 @@ RSpec.describe "Api::V1::Expenses", type: :request do
       }.to change { tenant_expense_count }.by(1)
 
       expect(response).to have_http_status(:created)
-      expect(response.parsed_body["status"]).to eq("pending")
-      expect(response.parsed_body["user_id"]).to eq(member.id)
+      expect(response.parsed_body.dig("data", "status")).to eq("pending")
+      expect(response.parsed_body.dig("data", "user_id")).to eq(member.id)
     end
 
     it "does not allow the client to override user_id or status" do
@@ -211,8 +234,8 @@ RSpec.describe "Api::V1::Expenses", type: :request do
            headers: headers
 
       expect(response).to have_http_status(:created)
-      expect(response.parsed_body["user_id"]).to eq(member.id)
-      expect(response.parsed_body["status"]).to eq("pending")
+      expect(response.parsed_body.dig("data", "user_id")).to eq(member.id)
+      expect(response.parsed_body.dig("data", "status")).to eq("pending")
     end
 
     it "does not enqueue an audit job when expense creation fails" do
@@ -230,7 +253,11 @@ RSpec.describe "Api::V1::Expenses", type: :request do
            },
            headers: headers
 
-      expect(response).to have_http_status(:unprocessable_entity)
+expect(response).to have_http_status(:unprocessable_entity)
+expect_standard_error_response(
+  code: "validation_error",
+  message: "Expense validation failed"
+)
     end
   end
 
@@ -241,7 +268,8 @@ RSpec.describe "Api::V1::Expenses", type: :request do
             headers: headers
 
       expect(response).to have_http_status(:ok)
-      expect(response.parsed_body["title"]).to eq("Updated title")
+      expect(response.parsed_body.dig("data", "title"))
+        .to eq("Updated title")
     end
 
     it "prevents updating another member's expense" do
@@ -261,7 +289,11 @@ RSpec.describe "Api::V1::Expenses", type: :request do
             params: { expense: { title: "Changed" } },
             headers: headers
 
-      expect(response).to have_http_status(:forbidden)
+expect(response).to have_http_status(:forbidden)
+expect_standard_error_response(
+  code: "forbidden",
+  message: "You are not authorized to perform this action"
+)
     end
   end
 
@@ -291,7 +323,7 @@ RSpec.describe "Api::V1::Expenses", type: :request do
 
       expect(response).to have_http_status(:ok)
 
-      ids = response.parsed_body["expenses"].map do |expense|
+      ids = response.parsed_body["data"].map do |expense|
         expense["id"]
       end
 
@@ -312,7 +344,7 @@ RSpec.describe "Api::V1::Expenses", type: :request do
 
       expect(response).to have_http_status(:ok)
 
-      ids = response.parsed_body["expenses"].map do |expense|
+      ids = response.parsed_body["data"].map do |expense|
         expense["id"]
       end
 
@@ -332,7 +364,7 @@ RSpec.describe "Api::V1::Expenses", type: :request do
 
       expect(response).to have_http_status(:ok)
 
-      ids = response.parsed_body["expenses"].map do |item|
+      ids = response.parsed_body["data"].map do |item|
         item["id"]
       end
 
@@ -354,7 +386,7 @@ RSpec.describe "Api::V1::Expenses", type: :request do
 
       expect(response).to have_http_status(:ok)
 
-      ids = response.parsed_body["expenses"].map do |item|
+      ids = response.parsed_body["data"].map do |item|
         item["id"]
       end
 
@@ -377,7 +409,7 @@ RSpec.describe "Api::V1::Expenses", type: :request do
 
       expect(response).to have_http_status(:ok)
 
-      ids = response.parsed_body["expenses"].map do |item|
+      ids = response.parsed_body["data"].map do |item|
         item["id"]
       end
 
@@ -406,7 +438,7 @@ RSpec.describe "Api::V1::Expenses", type: :request do
           headers: headers
 
       expect(response).to have_http_status(:unprocessable_entity)
-      expect(response.parsed_body["error"]).to include("Unknown filters")
+      expect(response.parsed_body.dig("error", "message")).to include("Unknown filters")
     end
   end
 
@@ -424,11 +456,11 @@ RSpec.describe "Api::V1::Expenses", type: :request do
 
       body = response.parsed_body
 
-      expect(body["expenses"].length).to eq(10)
-      expect(body["pagination"]["current_page"]).to eq(1)
-      expect(body["pagination"]["per_page"]).to eq(10)
-      expect(body["pagination"]["total_count"]).to eq(25)
-      expect(body["pagination"]["total_pages"]).to eq(3)
+      expect(body["data"].length).to eq(10)
+      expect(body.dig("meta", "pagination", "current_page")).to eq(1)
+      expect(body.dig("meta", "pagination", "per_page")).to eq(10)
+      expect(body.dig("meta", "pagination", "total_count")).to eq(25)
+      expect(body.dig("meta", "pagination", "total_pages")).to eq(3)
     end
 
     it "returns different records on the second page" do
@@ -440,7 +472,7 @@ RSpec.describe "Api::V1::Expenses", type: :request do
           params: { page: 1, per_page: 10 },
           headers: headers
 
-      first_page_ids = response.parsed_body["expenses"].map do |expense|
+      first_page_ids = response.parsed_body["data"].map do |expense|
         expense["id"]
       end
 
@@ -448,7 +480,7 @@ RSpec.describe "Api::V1::Expenses", type: :request do
           params: { page: 2, per_page: 10 },
           headers: headers
 
-      second_page_ids = response.parsed_body["expenses"].map do |expense|
+      second_page_ids = response.parsed_body["data"].map do |expense|
         expense["id"]
       end
 
@@ -466,8 +498,8 @@ RSpec.describe "Api::V1::Expenses", type: :request do
       body = response.parsed_body
 
       expect(response).to have_http_status(:ok)
-      expect(body["expenses"].length).to eq(20)
-      expect(body["pagination"]["per_page"]).to eq(20)
+      expect(body["data"].length).to eq(20)
+      expect(body.dig("meta", "pagination", "per_page")).to eq(20)
     end
 
     it "caps per_page at 100" do
@@ -482,8 +514,8 @@ RSpec.describe "Api::V1::Expenses", type: :request do
       body = response.parsed_body
 
       expect(response).to have_http_status(:ok)
-      expect(body["expenses"].length).to eq(100)
-      expect(body["pagination"]["per_page"]).to eq(100)
+      expect(body["data"].length).to eq(100)
+      expect(body.dig("meta", "pagination", "per_page")).to eq(100)
     end
 
     it "returns 422 for an invalid page" do
@@ -515,9 +547,9 @@ RSpec.describe "Api::V1::Expenses", type: :request do
 
       body = response.parsed_body
 
-      expect(body["expenses"].length).to eq(10)
-      expect(body["pagination"]["per_page"]).to eq(10)
-      expect(body["pagination"]["next_cursor"]).to be_present
+      expect(body["data"].length).to eq(10)
+      expect(body.dig("meta", "pagination", "per_page")).to eq(10)
+      expect(body.dig("meta", "pagination", "next_cursor")).to be_present
     end
 
     it "returns the next cursor page without duplicates or gaps" do
@@ -538,8 +570,8 @@ RSpec.describe "Api::V1::Expenses", type: :request do
       expect(response).to have_http_status(:ok)
 
       first_body = response.parsed_body
-      first_page_ids = first_body["expenses"].map { |expense| expense["id"] }
-      cursor = first_body.dig("pagination", "next_cursor")
+      first_page_ids = first_body["data"].map { |expense| expense["id"] }
+      cursor = first_body.dig("meta", "pagination", "next_cursor")
 
       expect(cursor).to be_present
 
@@ -554,7 +586,7 @@ RSpec.describe "Api::V1::Expenses", type: :request do
       expect(response).to have_http_status(:ok)
 
       second_body = response.parsed_body
-      second_page_ids = second_body["expenses"].map { |expense| expense["id"] }
+      second_page_ids = second_body["data"].map { |expense| expense["id"] }
 
       expect(second_page_ids.length).to eq(10)
       expect(first_page_ids & second_page_ids).to be_empty
@@ -584,8 +616,8 @@ RSpec.describe "Api::V1::Expenses", type: :request do
 
       body = response.parsed_body
 
-      expect(body["expenses"].length).to eq(1)
-      expect(body["pagination"]["next_cursor"]).to be_nil
+      expect(body["data"].length).to eq(1)
+      expect(body.dig("meta", "pagination", "next_cursor")).to be_nil
     end
   end
 end

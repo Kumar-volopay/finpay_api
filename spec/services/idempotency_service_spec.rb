@@ -61,53 +61,47 @@ RSpec.describe IdempotencyService do
       )
     end
 
-    it "rejects a key already used for another expense" do
-      another_expense = create(
-        :expense,
-        user: employee,
-        category: category
-      )
+it "rejects a key already used for another expense" do
+  another_expense = create(
+    :expense,
+    user: employee,
+    category: category
+  )
 
-      described_class.call(
-        expense: expense,
-        actor: employee,
-        key: key,
-        fingerprint: fingerprint
-      )
+  described_class.call(
+    expense: expense,
+    actor: employee,
+    key: key,
+    fingerprint: fingerprint
+  )
 
-      result = described_class.call(
-        expense: another_expense,
-        actor: employee,
-        key: key,
-        fingerprint: fingerprint
-      )
+  expect {
+    described_class.call(
+      expense: another_expense,
+      actor: employee,
+      key: key,
+      fingerprint: fingerprint
+    )
+  }.to raise_error(ApiErrors::IdempotencyConflict)
+end
 
-      expect(result.success?).to be(false)
-      expect(result.error).to eq(
-        "Idempotency key already used for another expense"
-      )
-    end
+it "rejects the same key with a different fingerprint" do
+  described_class.call(
+    expense: expense,
+    actor: employee,
+    key: key,
+    fingerprint: fingerprint
+  )
 
-    it "rejects the same key with a different fingerprint" do
-      described_class.call(
-        expense: expense,
-        actor: employee,
-        key: key,
-        fingerprint: fingerprint
-      )
-
-      result = described_class.call(
-        expense: expense,
-        actor: employee,
-        key: key,
-        fingerprint: "different-fingerprint"
-      )
-
-      expect(result.success?).to be(false)
-      expect(result.error).to eq(
-        "Idempotency key reused with different request"
-      )
-    end
+  expect {
+    described_class.call(
+      expense: expense,
+      actor: employee,
+      key: key,
+      fingerprint: "different-fingerprint"
+    )
+  }.to raise_error(ApiErrors::IdempotencyConflict)
+end
 
     it "rejects a missing idempotency key" do
       result = described_class.call(

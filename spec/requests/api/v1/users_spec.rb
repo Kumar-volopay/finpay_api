@@ -79,7 +79,11 @@ RSpec.describe "Api::V1::Auth", type: :request do
 
       expect(response).to have_http_status(:unauthorized)
       expect(response.parsed_body).to eq(
-        "error" => "Invalid invitation"
+        "error" => {
+          "code" => "invalid_invitation",
+          "message" => "Invalid invitation",
+          "details" => {}
+        }
       )
     end
 

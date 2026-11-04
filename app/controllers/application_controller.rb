@@ -1,5 +1,9 @@
+# frozen_string_literal: true
+
 class ApplicationController < ActionController::API
   include Pundit::Authorization
+  include ApiResponder
+  include ErrorHandler
 
   before_action :require_authenticated_user
   after_action :verify_authorized
@@ -8,19 +12,15 @@ class ApplicationController < ActionController::API
     @current_user
   end
 
-  rescue_from Pundit::NotAuthorizedError do
-    render json: { error: "Forbidden" }, status: :forbidden
-  end
-
-  rescue_from ActiveRecord::RecordNotFound do
-    render json: { error: "Not Found" }, status: :not_found
-  end
-
   private
 
   def require_authenticated_user
     return if @current_user.present?
 
-    render json: { error: "Unauthorized" }, status: :unauthorized
+    render_error(
+      code: "unauthorized",
+      message: "Authentication required",
+      status: :unauthorized
+    )
   end
 end

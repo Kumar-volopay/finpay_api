@@ -16,7 +16,7 @@ module Api
         pagination_mode = params.fetch(:pagination, "offset").to_s
 
         unless %w[offset cursor].include?(pagination_mode)
-          raise ArgumentError, "Invalid pagination mode"
+          raise ApiErrors::InvalidRequest, "Invalid pagination mode"
         end
 
         if pagination_mode == "cursor" || params[:cursor].present?
@@ -24,17 +24,14 @@ module Api
         else
           render_offset_page(expenses, per_page)
         end
-      rescue ArgumentError => e
-        render json: { error: e.message },
-               status: :unprocessable_entity
       end
-
       def show
         expense = policy_scope(Expense).find(params[:id])
         authorize expense
 
-        render json: ExpenseSerializer.new(expense).serialize,
-               status: :ok
+        render_success(
+          data: JSON.parse(ExpenseSerializer.new(expense).serialize)
+        )
       end
 
       def create
@@ -46,11 +43,17 @@ module Api
         authorize expense
 
         if expense.save
-          render json: ExpenseSerializer.new(expense).serialize,
-                 status: :created
+          render_success(
+            data: JSON.parse(ExpenseSerializer.new(expense).serialize),
+            status: :created
+          )
         else
-          render json: { errors: expense.errors.full_messages },
-                 status: :unprocessable_entity
+          render_error(
+            code: "validation_error",
+            message: "Expense validation failed",
+            details: expense.errors.full_messages,
+            status: :unprocessable_entity
+          )
         end
       end
 
@@ -59,11 +62,16 @@ module Api
         authorize expense
 
         if expense.update(expense_params)
-          render json: ExpenseSerializer.new(expense).serialize,
-                 status: :ok
+          render_success(
+            data: JSON.parse(ExpenseSerializer.new(expense).serialize)
+          )
         else
-          render json: { errors: expense.errors.full_messages },
-                 status: :unprocessable_entity
+          render_error(
+  code: "validation_error",
+  message: "Expense validation failed",
+  details: expense.errors.full_messages,
+  status: :unprocessable_entity
+)
         end
       end
 
@@ -102,8 +110,11 @@ module Api
         if idempotency_key.present? &&
            (idempotency_key.length > 255 ||
             !idempotency_key.match?(/\A[A-Za-z0-9._:-]+\z/))
-          return render json: { error: "Invalid Idempotency-Key" },
-                        status: :bad_request
+          return render_error(
+  code: "invalid_idempotency_key",
+  message: "Invalid Idempotency-Key",
+  status: :bad_request
+)
         end
 
         fingerprint_data = {
@@ -132,11 +143,16 @@ module Api
         if result.success?
           response.set_header("Idempotent-Replayed", "true") if result.replayed?
 
-          render json: result.response_body,
-                 status: result.response_status || :ok
+          render_success(
+            data: result.response_body,
+            status: result.response_status || :ok
+          )
         else
-          render json: { error: result.error },
-                 status: result.response_status || :unprocessable_entity
+          render_error(
+            code: result.error_code || "workflow_error",
+            message: result.error,
+            status: result.response_status || :unprocessable_entity
+          )
         end
       end
 
@@ -179,13 +195,15 @@ module Api
           ExpenseSerializer.new(page_records).serialize
         )
 
-        render json: {
-          expenses: serialized_expenses,
-          pagination: {
-            per_page: per_page,
-            next_cursor: next_cursor
+        render_success(
+          data: serialized_expenses,
+          meta: {
+            pagination: {
+              per_page: per_page,
+              next_cursor: next_cursor
+            }
           }
-        }, status: :ok
+       )
       end
 
       def render_offset_page(expenses, per_page)
@@ -200,15 +218,17 @@ module Api
           ExpenseSerializer.new(paginated_expenses).serialize
         )
 
-        render json: {
-          expenses: serialized_expenses,
-          pagination: {
-            current_page: paginated_expenses.current_page,
-            per_page: paginated_expenses.limit_value,
-            total_count: paginated_expenses.total_count,
-            total_pages: paginated_expenses.total_pages
+        render_success(
+          data: serialized_expenses,
+          meta: {
+            pagination: {
+              current_page: paginated_expenses.current_page,
+              per_page: paginated_expenses.limit_value,
+              total_count: paginated_expenses.total_count,
+              total_pages: paginated_expenses.total_pages
+            }
           }
-        }, status: :ok
+        )
       end
 
       def expense_params
@@ -231,7 +251,7 @@ module Api
         unknown_filters = request.query_parameters.keys - allowed_query_params
 
         if unknown_filters.any?
-          raise ArgumentError,
+          raise ApiErrors::InvalidRequest,
                 "Unknown filters: #{unknown_filters.join(', ')}"
         end
 
@@ -242,7 +262,7 @@ module Api
         value = params.fetch(:page, 1).to_s
 
         unless value.match?(/\A[1-9]\d*\z/)
-          raise ArgumentError, "Invalid page"
+          raise ApiErrors::InvalidRequest, "Invalid page"
         end
 
         value.to_i
@@ -252,7 +272,7 @@ module Api
         value = params.fetch(:per_page, 20).to_s
 
         unless value.match?(/\A[1-9]\d*\z/)
-          raise ArgumentError, "Invalid per_page"
+          raise ApiErrors::InvalidRequest, "Invalid per_page"
         end
 
         [ value.to_i, 100 ].min

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module TenantLoader
   extend ActiveSupport::Concern
 
@@ -8,52 +10,42 @@ module TenantLoader
   private
 
   def load_tenant_from_jwt
-    begin
-      token = bearer_token
-      payload = Authentication::TokenService.decode(token)
+    token = bearer_token
+    payload = Authentication::TokenService.decode(token)
 
-      company_id = payload["company_id"]
-      user_id = payload["sub"]
-      jti = payload["jti"]
+    company_id = payload["company_id"]
+    user_id = payload["sub"]
+    jti = payload["jti"]
 
-      raise JWT::DecodeError unless company_id && user_id && jti
+    raise JWT::DecodeError unless company_id && user_id && jti
 
-      revoked = JwtDenylist.exists?(jti: jti)
-      raise JWT::DecodeError if revoked
+    revoked = JwtDenylist.exists?(jti: jti)
+    raise JWT::DecodeError if revoked
 
-      company = Company.find_by(id: company_id)
-      raise ActiveRecord::RecordNotFound unless company
-      @current_company = company
+    company = Company.find_by(id: company_id)
+    raise ApiErrors::TenantNotFound unless company
 
-    rescue JWT::DecodeError, ActiveRecord::RecordNotFound
-      render json: { error: "Unauthorized" }, status: :unauthorized
-      return
+    @current_company = company
+
+    Apartment::Tenant.switch(company.subdomain) do
+      @current_user = User.find_by(id: user_id)
+
+      raise ApiErrors::InvalidToken unless @current_user
+
+      yield
     end
-
-    begin
-      Apartment::Tenant.switch(company.subdomain) do
-        @current_user = User.find_by(id: user_id)
-
-        unless @current_user
-          render json: { error: "Unauthorized" }, status: :unauthorized
-          next
-        end
-
-        yield
-      end
-
-    rescue Apartment::TenantNotFound
-      render json: { error: "Unauthorized" }, status: :unauthorized
-
-    ensure
-      Apartment::Tenant.reset
-    end
+  rescue JWT::DecodeError
+    raise ApiErrors::InvalidToken
+  rescue Apartment::TenantNotFound
+    raise ApiErrors::TenantNotFound
+  ensure
+    Apartment::Tenant.reset
   end
 
   def bearer_token
     scheme, token = request.headers["Authorization"].to_s.split(" ", 2)
 
-    raise JWT::DecodeError unless scheme == "Bearer" && token.present?
+    raise ApiErrors::AuthenticationRequired unless scheme == "Bearer" && token.present?
 
     token
   end

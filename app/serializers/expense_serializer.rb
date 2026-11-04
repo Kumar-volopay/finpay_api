@@ -7,6 +7,6 @@ class ExpenseSerializer
              :incurred_on, :category_id, :user_id, :created_at, :updated_at
 
   attribute :amount do |expense|
-    expense.amount_decimal
+    ExpensePresenter.new(expense).amount
   end
 end

@@ -77,6 +77,20 @@ RSpec.describe Expense do
     expect(expense.amount_decimal).to eq("12.34")
   end
 
+  describe "reference number generation" do
+    it "generates a reference number using the expense ID" do
+      expense = create(:expense)
+
+      expect(expense.reference_number).to eq("EXP-#{expense.id}")
+    end
+
+    it "preserves an explicitly supplied reference number" do
+      expense = create(:expense, reference_number: "CUSTOM-123")
+
+      expect(expense.reference_number).to eq("CUSTOM-123")
+    end
+  end
+
   it "encrypts notes in the database" do
     expense = create(:expense, notes: "Private notes")
 

@@ -13,15 +13,13 @@ module Api
         company = Company.find_by(subdomain: params[:subdomain])
 
         unless company
-          return render json: { error: "Invalid invitation" },
-                        status: :unauthorized
+          raise ApiErrors::InvalidInvitation
         end
 
         raw_token = params[:invitation_token].to_s
 
         if raw_token.blank?
-          return render json: { error: "Invalid invitation" },
-                        status: :unauthorized
+          raise ApiErrors::InvalidInvitation
         end
 
         Apartment::Tenant.switch(company.subdomain) do
@@ -30,14 +28,13 @@ module Api
 
           unless invitation&.usable? &&
                  invitation.email == params[:email].to_s.strip.downcase
-            return render json: { error: "Invalid invitation" },
-                          status: :unauthorized
+            raise ApiErrors::InvalidInvitation
           end
 
           user = User.new(user_params)
           user.role = User.roles.key(invitation.role)
 
-          if user.save
+          user.save!
             invitation.update!(accepted_at: Time.current)
 
             token = Authentication::TokenService.encode(
@@ -52,10 +49,6 @@ module Api
               access_token: token,
               refresh_token: refresh_token
             }, status: :created
-          else
-            render json: { errors: user.errors.full_messages },
-                   status: :unprocessable_entity
-          end
         end
       end
 
@@ -63,8 +56,7 @@ module Api
         company = Company.find_by(subdomain: params[:subdomain])
 
         unless company
-          return render json: { error: "Invalid credentials" },
-                        status: :unauthorized
+          raise ApiErrors::InvalidCredentials
         end
 
         Apartment::Tenant.switch(company.subdomain) do
@@ -80,8 +72,7 @@ module Api
           end
 
          unless authenticated
-           return render json: { error: "Invalid credentials" },
-                          status: :unauthorized
+           raise ApiErrors::InvalidCredentials
          end
 
           token = Authentication::TokenService.encode(
@@ -106,8 +97,7 @@ module Api
         raw_refresh_token = params[:refresh_token].to_s
 
         unless company && raw_refresh_token.present?
-          return render json: { error: "Invalid token" },
-                        status: :unauthorized
+          raise ApiErrors::InvalidToken
         end
 
         digest = Digest::SHA256.hexdigest(raw_refresh_token)
@@ -135,24 +125,22 @@ module Api
 
         head :no_content
       rescue JWT::DecodeError, KeyError,
-             ActiveRecord::RecordNotFound,
-             ActiveRecord::RecordNotUnique
-        render json: { error: "Invalid token" }, status: :unauthorized
+       ActiveRecord::RecordNotFound,
+       ActiveRecord::RecordNotUnique
+  raise ApiErrors::InvalidToken
       end
 
       def refresh
         raw_refresh_token = params[:refresh_token].to_s
 
         if raw_refresh_token.blank?
-          return render json: { error: "Invalid refresh token" },
-                        status: :unauthorized
+          raise ApiErrors::InvalidRefreshToken
         end
 
         company = Company.find_by(subdomain: params[:subdomain])
 
         unless company
-          return render json: { error: "Invalid refresh token" },
-                        status: :unauthorized
+          raise ApiErrors::InvalidRefreshToken
         end
 
         result = Authentication::RefreshTokenService.rotate(
@@ -161,8 +149,7 @@ module Api
         )
 
         unless result
-          return render json: { error: "Invalid refresh token" },
-                        status: :unauthorized
+          raise ApiErrors::InvalidRefreshToken
         end
 
         user, new_refresh_token = result

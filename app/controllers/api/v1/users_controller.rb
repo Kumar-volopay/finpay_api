@@ -8,11 +8,11 @@ module Api
 
         authorize user, :show?
 
-        render json: {
+        render_success(data: {
           id: user.id,
           email: user.email,
           role: user.role
-        }, status: :ok
+        })
       end
     end
   end

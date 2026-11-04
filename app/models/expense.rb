@@ -3,6 +3,8 @@
 class Expense < ApplicationRecord
   include AASM
 
+  before_create :assign_reference_number
+
   attr_accessor :audit_company_id
 
   after_create_commit :enqueue_creation_audit
@@ -65,6 +67,16 @@ class Expense < ApplicationRecord
   end
 
   private
+
+  def assign_reference_number
+    return if reference_number.present?
+
+    self.id ||= self.class.connection.select_value(
+      "SELECT nextval(pg_get_serial_sequence('expenses', 'id')::regclass)"
+    )
+
+    self.reference_number = "EXP-#{id}"
+  end
 
   def enqueue_creation_audit
     return unless audit_company_id
