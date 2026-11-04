@@ -114,4 +114,41 @@ RSpec.describe ExpensePolicy do
       expect(described_class::Scope.new(nil, scope).resolve).to be_empty
     end
   end
+
+  describe "workflow permissions" do
+    it "allows an admin to approve another member's expense" do
+      expect(described_class.new(admin, another_expense).approve?).to be true
+    end
+
+    it "prevents an admin from approving their own expense" do
+      admin_expense = build(:expense, user: admin, status: :pending)
+
+      expect(described_class.new(admin, admin_expense).approve?).to be false
+    end
+
+    it "allows an admin to reject an expense" do
+      expect(described_class.new(admin, another_expense).reject?).to be true
+    end
+
+    it "allows an admin to reimburse an expense" do
+      approved_expense = build(
+        :expense,
+        user: another_member,
+        status: :approved
+      )
+
+      expect(described_class.new(admin, approved_expense).reimburse?).to be true
+    end
+
+    it "denies a member from approving an expense" do
+      expect(described_class.new(member, another_expense).approve?).to be false
+    end
+
+    it "denies a member from rejecting or reimbursing an expense" do
+      policy = described_class.new(member, another_expense)
+
+      expect(policy.reject?).to be false
+      expect(policy.reimburse?).to be false
+    end
+  end
 end

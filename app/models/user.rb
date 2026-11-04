@@ -1,5 +1,8 @@
 class User < ApplicationRecord
   has_many :refresh_tokens, dependent: :destroy
+  has_many :activity_logs, foreign_key: :actor_id,
+                           inverse_of: :actor,
+                           dependent: :restrict_with_error
 
   devise :database_authenticatable,
          :jwt_authenticatable,

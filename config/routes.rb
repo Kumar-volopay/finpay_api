@@ -3,13 +3,20 @@ Rails.application.routes.draw do
 
   namespace :api do
     namespace :v1 do
-      resources :expenses, only: %i[index show create update destroy]
+      resources :expenses, only: %i[index show create update destroy] do
+        member do
+          post :approve
+          post :reject
+          post :reimburse
+          post :archive
+        end
+      end
+
       post "auth/register", to: "auth#register"
       post "auth/login", to: "auth#login"
       delete "auth/logout", to: "auth#logout"
       post "auth/refresh", to: "auth#refresh"
       post "invitations", to: "invitations#create"
-
       get "protected", to: "protected#index"
       get "users/:id", to: "users#show"
     end

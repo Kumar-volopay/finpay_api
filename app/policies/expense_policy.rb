@@ -21,6 +21,22 @@ class ExpensePolicy < ApplicationPolicy
     pending? && (admin? || own_expense?)
   end
 
+  def approve?
+    admin? && !own_expense?
+  end
+
+  def reject?
+    admin?
+  end
+
+  def reimburse?
+    admin? && !own_expense?
+  end
+
+  def archive?
+    admin? && record.reimbursed?
+  end
+
   class Scope < ApplicationPolicy::Scope
     def resolve
       return scope.none unless user
@@ -34,7 +50,7 @@ class ExpensePolicy < ApplicationPolicy
   private
 
   def admin?
-    user&.admin?
+    !!user&.admin?
   end
 
   def own_expense?
