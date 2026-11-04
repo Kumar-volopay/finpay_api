@@ -2,15 +2,18 @@
 
 class ApplicationService
   Result = Struct.new(
-    :success?,
-    :data,
-    :error,
-    :replayed?,
-    :response_status,
-    :response_body,
-    :record,
+    :success, :data, :error, :replayed,
+    :response_status, :response_body, :record,
     keyword_init: true
-  )
+  ) do
+    def success?
+      success
+    end
+
+    def replayed?
+      replayed
+    end
+  end
 
   def self.call(...)
     new(...).call
@@ -19,21 +22,20 @@ class ApplicationService
   private
 
   def success(data = nil, **attributes)
-    Result.new(
-      success?: true,
+    Result.new(**{
+      success: true,
       data: data,
       error: nil,
-      replayed?: false,
-      **attributes
-    )
+      replayed: false
+    }.merge(attributes))
   end
 
   def failure(error, status: 422)
     Result.new(
-      success?: false,
+      success: false,
       data: nil,
       error: error,
-      replayed?: false,
+      replayed: false,
       response_status: status
     )
   end

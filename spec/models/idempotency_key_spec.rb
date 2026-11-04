@@ -22,6 +22,7 @@ RSpec.describe IdempotencyKey do
       record = build(
         :idempotency_key,
         expense: expense,
+        actor: employee,
         key: nil
       )
 
@@ -42,6 +43,7 @@ RSpec.describe IdempotencyKey do
       create(
         :idempotency_key,
         expense: expense,
+        actor: employee,
         key: "global-key-001"
       )
 
@@ -54,6 +56,7 @@ RSpec.describe IdempotencyKey do
       duplicate = build(
         :idempotency_key,
         expense: another_expense,
+        actor: employee,
         key: "global-key-001"
       )
 
@@ -67,6 +70,7 @@ RSpec.describe IdempotencyKey do
       create(
         :idempotency_key,
         expense: expense,
+        actor: employee,
         key: "global-key-002"
       )
 
@@ -79,6 +83,7 @@ RSpec.describe IdempotencyKey do
       record = build(
         :idempotency_key,
         expense: another_expense,
+        actor: employee,
         key: "global-key-003"
       )
 

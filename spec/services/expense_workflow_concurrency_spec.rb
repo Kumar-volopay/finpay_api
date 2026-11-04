@@ -48,7 +48,6 @@ RSpec.describe ExpenseWorkflowService do
 
       2.times { ready.pop }
       2.times { start << true }
-
       threads.each(&:join)
 
       outcomes = 2.times.map { results.pop }
@@ -56,13 +55,29 @@ RSpec.describe ExpenseWorkflowService do
       expect(outcomes).not_to include(an_instance_of(StandardError))
       expect(outcomes.count(true)).to eq(1)
       expect(outcomes.count(false)).to eq(1)
-
       expect(expense_record.reload).to be_approved
       expect(ActivityLog.where(expense: expense_record).count).to eq(1)
     ensure
       threads&.each { |thread| thread.kill if thread.alive? }
-      ActivityLog.where(expense: expense_record).delete_all if expense_record&.persisted?
-      Expense.where(id: expense_record&.id).delete_all if expense_record&.persisted?
+
+      if expense_record&.persisted?
+        connection = ActiveRecord::Base.connection
+
+        begin
+          connection.execute(
+            "ALTER TABLE activity_logs DISABLE TRIGGER prevent_activity_log_mutation"
+          )
+
+          ActivityLog.where(expense: expense_record).delete_all
+        ensure
+          connection.execute(
+            "ALTER TABLE activity_logs ENABLE TRIGGER prevent_activity_log_mutation"
+          )
+        end
+
+        Expense.where(id: expense_record.id).delete_all
+      end
+
       User.where(id: [ employee&.id, admin&.id ].compact).delete_all
       Category.where(id: category&.id).delete_all
     end

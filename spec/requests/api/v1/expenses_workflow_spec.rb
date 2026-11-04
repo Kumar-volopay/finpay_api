@@ -91,6 +91,21 @@ RSpec.describe "Api::V1::Expenses workflow", type: :request do
       expect(tenant_activity_log_count(expense)).to eq(1)
     end
 
+    it "replays the original approval response for the same request" do
+      expense = create_expense(member, category, "Replay approval")
+      headers = admin_headers.merge("Idempotency-Key" => "workflow-approve-replay-001")
+
+      post "/api/v1/expenses/#{expense.id}/approve", headers: headers
+      first_response = response.parsed_body
+
+      post "/api/v1/expenses/#{expense.id}/approve", headers: headers
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body).to eq(first_response)
+      expect(response.headers["Idempotent-Replayed"]).to eq("true")
+      expect(tenant_activity_log_count(expense)).to eq(1)
+    end
+
     it "prevents an admin from approving their own expense" do
       expense = create_expense(admin, category, "Admin own expense")
 
@@ -132,6 +147,21 @@ RSpec.describe "Api::V1::Expenses workflow", type: :request do
       expect(tenant_activity_log_count(expense)).to eq(1)
     end
   end
+
+    it "replays the original rejection response for the same request" do
+      expense = create_expense(member, category, "Replay rejection")
+      headers = admin_headers.merge("Idempotency-Key" => "workflow-reject-replay-001")
+
+      post "/api/v1/expenses/#{expense.id}/reject", headers: headers
+      first_response = response.parsed_body
+
+      post "/api/v1/expenses/#{expense.id}/reject", headers: headers
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body).to eq(first_response)
+      expect(response.headers["Idempotent-Replayed"]).to eq("true")
+      expect(tenant_activity_log_count(expense)).to eq(1)
+    end
 
   describe "POST /api/v1/expenses/:id/reimburse" do
     it "allows an admin to reimburse an approved expense" do
@@ -312,4 +342,47 @@ RSpec.describe "Api::V1::Expenses workflow", type: :request do
         expect(ActivityLog.where(expense: other_expense)).to be_empty
       end
     end
+
+  describe "POST /api/v1/expenses/:id/archive" do
+    it "allows an admin to archive a reimbursed expense" do
+      expense = create_expense(member, category, "Archive expense", status: :reimbursed)
+
+      post "/api/v1/expenses/#{expense.id}/archive",
+           headers: admin_headers
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body["status"]).to eq("archived")
+
+      Apartment::Tenant.switch(company.subdomain) do
+        expect(expense.reload).to be_archived
+        log = ActivityLog.find_by!(expense: expense, action: "archive")
+        expect(log.from_state).to eq("reimbursed")
+        expect(log.to_state).to eq("archived")
+      end
+    end
+
+    it "does not allow a member to archive an expense" do
+      expense = create_expense(member, category, "Unauthorized archive", status: :reimbursed)
+
+      post "/api/v1/expenses/#{expense.id}/archive",
+           headers: member_headers
+
+      expect(response).to have_http_status(:forbidden)
+      Apartment::Tenant.switch(company.subdomain) do
+        expect(expense.reload).to be_reimbursed
+      end
+    end
+
+    it "does not allow an admin to archive an expense that is not reimbursed" do
+      expense = create_expense(member, category, "Pending archive", status: :pending)
+
+      post "/api/v1/expenses/#{expense.id}/archive",
+           headers: admin_headers
+
+      expect(response).to have_http_status(:forbidden)
+      Apartment::Tenant.switch(company.subdomain) do
+        expect(expense.reload).to be_pending
+      end
+    end
+  end
 end

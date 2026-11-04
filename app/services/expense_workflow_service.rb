@@ -1,68 +1,74 @@
-
 # frozen_string_literal: true
 
 class ExpenseWorkflowService < ApplicationService
-  ACTIONS = %i[approve reject reimburse].freeze
+  ACTIONS = %i[approve reject reimburse archive].freeze
 
-  def initialize(expense:, actor:, action:, idempotency_key: nil, request_fingerprint: nil)
+  def initialize(expense:, actor:, action:, idempotency_key: nil, request_fingerprint: nil, metadata: {})
     @expense = expense
     @actor = actor
     @action = action.to_sym
     @idempotency_key = idempotency_key
     @request_fingerprint = request_fingerprint
+    @metadata = metadata
   end
 
   def call
     return failure("Unsupported workflow action") unless ACTIONS.include?(@action)
 
-    if @action == :reimburse
-      return failure("Idempotency key is required", status: 400) if @idempotency_key.blank?
-      return failure("Request fingerprint is required") if @request_fingerprint.blank?
+    if @action == :reimburse && @idempotency_key.blank?
+      return failure("Idempotency key is required", status: 400)
+    end
+
+    if @idempotency_key.present? && @request_fingerprint.blank?
+      return failure("Request fingerprint is required")
     end
 
     @expense.with_lock do
-      if @action == :reimburse
-        idempotency_result = reserve_idempotency_key
-
-        if !idempotency_result.success?
-          idempotency_result
-        elsif idempotency_result.replayed?
-          success(
-            @expense,
-            replayed?: true,
-            response_status: idempotency_result.response_status,
-            response_body: idempotency_result.response_body
-          )
-        else
-          @idempotency_record = idempotency_result.record
-          execute_transition
-        end
-      else
-        execute_transition
-      end
+      process_idempotency
     end
   rescue AASM::InvalidTransition
     failure("Invalid expense status transition")
   rescue ActiveRecord::RecordInvalid => e
-    failure(e.record.errors.full_messages)
-  rescue ActiveRecord::RecordNotUnique
-    failure("Idempotency key has already been used", status: 422)
+    failure(e.record.errors.full_messages.join(", "))
   end
 
   private
 
+  def process_idempotency
+    return execute_transition if @idempotency_key.blank?
+
+    result = reserve_idempotency_key
+
+    return result unless result.success?
+    return replay_response(result) if result.replayed?
+
+    @idempotency_record = result.record
+    execute_transition
+  end
+
+  def replay_response(result)
+    success(
+      @expense,
+      replayed: true,
+      response_status: result.response_status,
+      response_body: result.response_body
+    )
+  end
+
   def execute_transition
     from_state = @expense.status
-
-    perform_transition
     record_actor_and_timestamp
+    perform_transition
 
     ActivityLog.create!(
       expense: @expense,
       actor: @actor,
       action: @action,
       from_state: from_state,
-      to_state: @expense.status
+      to_state: @expense.status,
+      metadata: @metadata.merge(
+        idempotency_key: @idempotency_key
+      ).compact
     )
 
     response_body = {
@@ -70,7 +76,7 @@ class ExpenseWorkflowService < ApplicationService
       status: @expense.status
     }
 
-    if @action == :reimburse
+    if @idempotency_record
       @idempotency_record.update!(
         response_status: 200,
         response_body: response_body
@@ -84,9 +90,11 @@ class ExpenseWorkflowService < ApplicationService
     )
   end
 
+
   def reserve_idempotency_key
     IdempotencyService.call(
       expense: @expense,
+      actor: @actor,
       key: @idempotency_key,
       fingerprint: @request_fingerprint
     )
@@ -100,6 +108,8 @@ class ExpenseWorkflowService < ApplicationService
       @expense.reject!
     when :reimburse
       @expense.reimburse!
+    when :archive
+      @expense.archive!
     end
   end
 
@@ -108,11 +118,11 @@ class ExpenseWorkflowService < ApplicationService
 
     case @action
     when :approve
-      @expense.update!(approved_by: @actor, approved_at: timestamp)
+      @expense.assign_attributes(approved_by: @actor, approved_at: timestamp)
     when :reject
-      @expense.update!(rejected_by: @actor, rejected_at: timestamp)
+      @expense.assign_attributes(rejected_by: @actor, rejected_at: timestamp)
     when :reimburse
-      @expense.update!(reimbursed_by: @actor, reimbursed_at: timestamp)
+      @expense.assign_attributes(reimbursed_by: @actor, reimbursed_at: timestamp)
     end
   end
 end

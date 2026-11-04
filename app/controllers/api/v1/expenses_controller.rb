@@ -87,24 +87,49 @@ module Api
         process_workflow(:reimburse)
       end
 
+      def archive
+        process_workflow(:archive)
+      end
+
       private
       def process_workflow(action)
         expense = policy_scope(Expense).find(params[:id])
         authorize expense, "#{action}?".to_sym
 
-        fingerprint = Digest::SHA256.hexdigest(
-          [ action, params.except(:controller, :action, :id).to_unsafe_h.to_json ].join(":")
-        )
+        idempotency_key = request.headers["Idempotency-Key"]
+
+        if idempotency_key.present? &&
+           (idempotency_key.length > 255 ||
+            !idempotency_key.match?(/\A[A-Za-z0-9._:-]+\z/))
+          return render json: { error: "Invalid Idempotency-Key" },
+                        status: :bad_request
+        end
+
+        fingerprint_data = {
+          action: action,
+          expense_id: expense.id,
+          actor_id: @current_user.id,
+          params: canonicalize(params.except(:controller, :action, :id).to_unsafe_h)
+        }
+
+        fingerprint = Digest::SHA256.hexdigest(fingerprint_data.to_json)
 
         result = ExpenseWorkflowService.call(
           expense: expense,
           actor: @current_user,
           action: action,
-          idempotency_key: request.headers["Idempotency-Key"],
-          request_fingerprint: fingerprint
+          idempotency_key: idempotency_key,
+          request_fingerprint: fingerprint,
+          metadata: {
+            request_id: request.request_id,
+            ip_address: request.remote_ip,
+            reason: params[:reason]
+          }.compact
         )
 
         if result.success?
+          response.set_header("Idempotent-Replayed", "true") if result.replayed?
+
           render json: result.response_body,
                  status: result.response_status || :ok
         else
@@ -113,6 +138,18 @@ module Api
         end
       end
 
+      def canonicalize(value)
+        case value
+        when Hash
+          value.sort_by { |key, _| key.to_s }.to_h do |key, item|
+            [ key, canonicalize(item) ]
+          end
+        when Array
+          value.map { |item| canonicalize(item) }
+        else
+          value
+        end
+      end
 
       def render_cursor_page(expenses, per_page)
         ordered_expenses = expenses

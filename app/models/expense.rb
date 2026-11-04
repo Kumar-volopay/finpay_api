@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 class Expense < ApplicationRecord
+  include AASM
   belongs_to :user
   belongs_to :approved_by, class_name: "User", optional: true
   belongs_to :rejected_by, class_name: "User", optional: true
@@ -12,9 +13,9 @@ class Expense < ApplicationRecord
 
   encrypts :notes
 
-  include AASM
-
-  aasm column: :status, whiny_transitions: true do
+  aasm column: :status,
+       whiny_transitions: true,
+       whiny_persistence: true do
     state :pending, initial: true
     state :approved, :rejected, :reimbursed, :archived
 
@@ -34,6 +35,9 @@ class Expense < ApplicationRecord
       transitions from: :reimbursed, to: :archived
     end
   end
+
+  validates :status,
+            inclusion: { in: %w[pending approved rejected reimbursed archived] }
 
   validates :title, presence: true, length: { maximum: 255 }
   validates :amount_cents,

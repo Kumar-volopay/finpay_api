@@ -163,7 +163,7 @@ RSpec.describe ExpenseWorkflowService do
         result = described_class.call(
           expense: expense,
           actor: admin,
-          action: :archive
+          action: :invalid_action
         )
 
         expect(result.success?).to be(false)

@@ -18,6 +18,7 @@ RSpec.describe IdempotencyService do
     it "creates a new idempotency key" do
       result = described_class.call(
         expense: expense,
+        actor: employee,
         key: key,
         fingerprint: fingerprint
       )
@@ -31,6 +32,7 @@ RSpec.describe IdempotencyService do
     it "recognizes a previously completed request" do
       first_result = described_class.call(
         expense: expense,
+        actor: employee,
         key: key,
         fingerprint: fingerprint
       )
@@ -45,6 +47,7 @@ RSpec.describe IdempotencyService do
 
       second_result = described_class.call(
         expense: expense,
+        actor: employee,
         key: key,
         fingerprint: fingerprint
       )
@@ -67,12 +70,14 @@ RSpec.describe IdempotencyService do
 
       described_class.call(
         expense: expense,
+        actor: employee,
         key: key,
         fingerprint: fingerprint
       )
 
       result = described_class.call(
         expense: another_expense,
+        actor: employee,
         key: key,
         fingerprint: fingerprint
       )
@@ -86,12 +91,14 @@ RSpec.describe IdempotencyService do
     it "rejects the same key with a different fingerprint" do
       described_class.call(
         expense: expense,
+        actor: employee,
         key: key,
         fingerprint: fingerprint
       )
 
       result = described_class.call(
         expense: expense,
+        actor: employee,
         key: key,
         fingerprint: "different-fingerprint"
       )
@@ -105,6 +112,7 @@ RSpec.describe IdempotencyService do
     it "rejects a missing idempotency key" do
       result = described_class.call(
         expense: expense,
+        actor: employee,
         key: nil,
         fingerprint: fingerprint
       )
@@ -116,6 +124,7 @@ RSpec.describe IdempotencyService do
     it "rejects a missing request fingerprint" do
       result = described_class.call(
         expense: expense,
+        actor: employee,
         key: key,
         fingerprint: nil
       )

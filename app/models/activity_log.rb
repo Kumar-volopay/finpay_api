@@ -2,22 +2,21 @@
 
 class ActivityLog < ApplicationRecord
   belongs_to :expense
-  belongs_to :actor, class_name: "User"
+  belongs_to :actor, class_name: "User", inverse_of: :activity_logs
 
-  validates :action, presence: true
-  validates :from_state, presence: true
-  validates :to_state, presence: true
+  validates :action, inclusion: {
+    in: %w[approve reject reimburse archive]
+  }
 
-  before_update :prevent_modification
-  before_destroy :prevent_deletion
+  validates :from_state, inclusion: {
+    in: %w[pending approved rejected reimbursed archived]
+  }
 
-  private
+  validates :to_state, inclusion: {
+    in: %w[pending approved rejected reimbursed archived]
+  }
 
-  def prevent_modification
-    raise ActiveRecord::ReadOnlyRecord, "Activity logs cannot be modified"
-  end
-
-  def prevent_deletion
-    raise ActiveRecord::ReadOnlyRecord, "Activity logs cannot be deleted"
+  def readonly?
+    persisted?
   end
 end

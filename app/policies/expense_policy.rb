@@ -30,7 +30,11 @@ class ExpensePolicy < ApplicationPolicy
   end
 
   def reimburse?
-    admin?
+    admin? && !own_expense?
+  end
+
+  def archive?
+    admin? && record.reimbursed?
   end
 
   class Scope < ApplicationPolicy::Scope
@@ -46,7 +50,7 @@ class ExpensePolicy < ApplicationPolicy
   private
 
   def admin?
-    user&.admin?
+    !!user&.admin?
   end
 
   def own_expense?
