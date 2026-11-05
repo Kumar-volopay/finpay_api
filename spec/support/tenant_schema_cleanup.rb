@@ -14,6 +14,16 @@ module TenantSchemaCleanup
     @tenant_schemas_to_clean ||= []
     @tenant_schemas_to_clean << subdomain
   end
+
+  def provision_test_tenant(name:, prefix: "tenant", subdomain: nil)
+    subdomain ||= tenant_subdomain(prefix)
+    track_tenant_schema(subdomain)
+
+    Companies::Provision.call(
+      name: name,
+      subdomain: subdomain
+    )
+  end
 end
 
 RSpec.configure do |config|

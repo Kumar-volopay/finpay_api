@@ -1,7 +1,7 @@
 
 services:
   postgres:
-    image: postgres:16
+    image: postgres:16.15
     container_name: finpay_api_postgres
     environment:
       POSTGRES_USER: postgres

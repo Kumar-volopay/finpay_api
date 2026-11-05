@@ -11,30 +11,26 @@ module Api
 
       def register
         company = Company.find_by(subdomain: params[:subdomain])
-
-        unless company
-          raise ApiErrors::InvalidInvitation
-        end
+        raise ApiErrors::InvalidInvitation unless company
 
         raw_token = params[:invitation_token].to_s
-
-        if raw_token.blank?
-          raise ApiErrors::InvalidInvitation
-        end
+        raise ApiErrors::InvalidInvitation if raw_token.blank?
 
         Apartment::Tenant.switch(company.subdomain) do
           digest = Digest::SHA256.hexdigest(raw_token)
-          invitation = Invitation.lock.find_by(token_digest: digest)
 
-          unless invitation&.usable? &&
-                 invitation.email == params[:email].to_s.strip.downcase
-            raise ApiErrors::InvalidInvitation
-          end
+          registration = ActiveRecord::Base.transaction do
+            invitation = Invitation.lock.find_by(token_digest: digest)
 
-          user = User.new(user_params)
-          user.role = User.roles.key(invitation.role)
+            unless invitation&.usable? &&
+                   invitation.email == params[:email].to_s.strip.downcase
+              raise ApiErrors::InvalidInvitation
+            end
 
-          user.save!
+            user = User.new(user_params)
+            user.role = User.roles.key(invitation.role)
+            user.save!
+
             invitation.update!(accepted_at: Time.current)
 
             token = Authentication::TokenService.encode(
@@ -44,11 +40,14 @@ module Api
 
             refresh_token = Authentication::RefreshTokenService.issue(user: user)
 
-            render json: {
+            {
               user: { id: user.id, email: user.email, role: user.role },
               access_token: token,
               refresh_token: refresh_token
-            }, status: :created
+            }
+          end
+
+          render json: registration, status: :created
         end
       end
 
@@ -125,9 +124,9 @@ module Api
 
         head :no_content
       rescue JWT::DecodeError, KeyError,
-       ActiveRecord::RecordNotFound,
-       ActiveRecord::RecordNotUnique
-  raise ApiErrors::InvalidToken
+             ActiveRecord::RecordNotFound,
+             ActiveRecord::RecordNotUnique
+        raise ApiErrors::InvalidToken
       end
 
       def refresh

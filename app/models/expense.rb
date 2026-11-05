@@ -5,6 +5,8 @@ class Expense < ApplicationRecord
 
   before_create :assign_reference_number
 
+  validates :reference_number, uniqueness: true, allow_nil: true
+
   attr_accessor :audit_company_id
 
   after_create_commit :enqueue_creation_audit

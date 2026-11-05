@@ -82,7 +82,7 @@ it "rejects a key already used for another expense" do
       key: key,
       fingerprint: fingerprint
     )
-  }.to raise_error(ApiErrors::IdempotencyConflict)
+  }.to raise_error(DomainErrors::IdempotencyKeyUsed)
 end
 
 it "rejects the same key with a different fingerprint" do
@@ -100,7 +100,7 @@ it "rejects the same key with a different fingerprint" do
       key: key,
       fingerprint: "different-fingerprint"
     )
-  }.to raise_error(ApiErrors::IdempotencyConflict)
+  }.to raise_error(DomainErrors::IdempotencyFingerprintMismatch)
 end
 
     it "rejects a missing idempotency key" do

@@ -15,12 +15,6 @@ class ApplicationController < ActionController::API
   private
 
   def require_authenticated_user
-    return if @current_user.present?
-
-    render_error(
-      code: "unauthorized",
-      message: "Authentication required",
-      status: :unauthorized
-    )
+    raise ApiErrors::AuthenticationRequired unless @current_user.present?
   end
 end

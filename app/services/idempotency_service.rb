@@ -23,9 +23,13 @@ class IdempotencyService < ApplicationService
       new_record.expires_at = 24.hours.from_now
     end
 
-    raise ApiErrors::IdempotencyConflict if record.expense_id != @expense.id
+    if record.expense_id != @expense.id
+      raise DomainErrors::IdempotencyKeyUsed
+    end
 
-    raise ApiErrors::IdempotencyConflict if record.request_fingerprint != @fingerprint
+    if record.request_fingerprint != @fingerprint
+      raise DomainErrors::IdempotencyFingerprintMismatch
+    end
 
     if record.previously_new_record?
       return success(record, record: record)

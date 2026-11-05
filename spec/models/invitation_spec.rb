@@ -2,9 +2,9 @@ require "rails_helper"
 
 RSpec.describe Invitation, type: :model do
   let(:company) do
-    Companies::Provision.call(
+    provision_test_tenant(
       name: "Invitation Spec Company",
-      subdomain: "invitation_spec_company"
+      prefix: "invitation_spec"
     )
   end
 

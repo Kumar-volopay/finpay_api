@@ -28,19 +28,6 @@ RSpec.describe "Api::V1::Expenses", type: :request do
 
   let(:category) { create_category }
 
-  def expect_standard_error_response(code:, message:)
-    body = response.parsed_body
-
-    expect(body.keys).to contain_exactly("error")
-    expect(body.fetch("error").keys)
-      .to contain_exactly("code", "message", "details")
-    expect(body.dig("error", "code")).to eq(code)
-    expect(body.dig("error", "message")).to eq(message)
-
-    expect(response.body).not_to match(
-      /SELECT\s+.*FROM|INSERT INTO|UPDATE\s+.*SET|PG::|ActiveRecord::|app\/.*\.rb:\d+/i
-    )
-  end
 
   let!(:own_expense) do
     create_expense(member, category, "My expense")
@@ -253,11 +240,52 @@ expect_standard_error_response(
            },
            headers: headers
 
-expect(response).to have_http_status(:unprocessable_entity)
+expect(response).to have_http_status(:unprocessable_content)
 expect_standard_error_response(
   code: "validation_error",
-  message: "Expense validation failed"
+  message: "Record validation failed"
 )
+    end
+  end
+
+  describe "POST /api/v1/expenses parameter handling" do
+    it "returns a structured error when expense parameters are missing" do
+      post "/api/v1/expenses", headers: headers
+
+      expect(response).to have_http_status(:bad_request)
+      expect_standard_error_response(
+        code: "parameter_missing",
+        message: "A required request parameter is missing"
+      )
+    end
+  end
+
+  describe "POST /api/v1/expenses malformed JSON" do
+    it "returns a structured error for invalid JSON" do
+      post "/api/v1/expenses",
+           params: '{"expense":',
+           headers: headers.merge("CONTENT_TYPE" => "application/json")
+
+      expect(response).to have_http_status(:bad_request)
+      expect_standard_error_response(
+        code: "invalid_json",
+        message: "Request body contains invalid JSON"
+      )
+    end
+  end
+
+  describe "GET /api/v1/expenses unexpected errors" do
+    it "returns a generic 500 response for unexpected errors" do
+      allow(ExpenseFilter).to receive(:new)
+        .and_raise(StandardError, "Simulated internal failure")
+
+      get "/api/v1/expenses", headers: headers
+
+      expect(response).to have_http_status(:internal_server_error)
+      expect_standard_error_response(
+        code: "internal_server_error",
+        message: "An unexpected error occurred"
+      )
     end
   end
 
@@ -305,6 +333,27 @@ expect_standard_error_response(
       }.to change { tenant_expense_count }.by(-1)
 
       expect(response).to have_http_status(:no_content)
+    end
+
+    it "prevents deleting an expense with existing audit history" do
+      activity_log = Apartment::Tenant.switch(company.subdomain) do
+        create(
+          :activity_log,
+          expense: own_expense,
+          actor: own_expense.user
+        )
+      end
+
+      expect {
+        delete "/api/v1/expenses/#{own_expense.id}", headers: headers
+      }.not_to change { tenant_expense_count }
+
+      expect(response).to have_http_status(:unprocessable_content)
+
+      Apartment::Tenant.switch(company.subdomain) do
+        expect(ActivityLog.exists?(activity_log.id)).to be(true)
+        expect(Expense.exists?(own_expense.id)).to be(true)
+      end
     end
 
     it "prevents deleting another member's expense" do
@@ -421,7 +470,7 @@ expect_standard_error_response(
           params: { from: "invalid-date" },
           headers: headers
 
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
 
     it "returns 422 for an unknown status" do
@@ -429,7 +478,7 @@ expect_standard_error_response(
           params: { status: "cancelled" },
           headers: headers
 
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
 
     it "returns 422 for an unknown filter parameter" do
@@ -437,7 +486,7 @@ expect_standard_error_response(
           params: { unknown_filter: "value" },
           headers: headers
 
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
       expect(response.parsed_body.dig("error", "message")).to include("Unknown filters")
     end
   end
@@ -523,7 +572,7 @@ expect_standard_error_response(
           params: { page: 0 },
           headers: headers
 
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
 
     it "returns 422 for an invalid per_page" do
@@ -531,7 +580,7 @@ expect_standard_error_response(
           params: { per_page: 0 },
           headers: headers
 
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
 
     it "returns the first cursor page with a next cursor" do
@@ -601,7 +650,7 @@ expect_standard_error_response(
           },
           headers: headers
 
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
     end
 
     it "returns nil next_cursor when there are no more records" do

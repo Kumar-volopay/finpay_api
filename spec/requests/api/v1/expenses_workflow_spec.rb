@@ -132,7 +132,8 @@ RSpec.describe "Api::V1::Expenses workflow", type: :request do
       expense = create_expense(member, category, "Rejection expense")
 
       post "/api/v1/expenses/#{expense.id}/reject",
-           headers: admin_headers
+           headers: admin_headers,
+           params: { reason: "Does not meet expense policy" }
 
       expect(response).to have_http_status(:ok)
       expect(response.parsed_body.dig("data", "status")).to eq("rejected")
@@ -148,10 +149,12 @@ RSpec.describe "Api::V1::Expenses workflow", type: :request do
       expense = create_expense(member, category, "Replay rejection")
       headers = admin_headers.merge("Idempotency-Key" => "workflow-reject-replay-001")
 
-      post "/api/v1/expenses/#{expense.id}/reject", headers: headers
+      post "/api/v1/expenses/#{expense.id}/reject", headers: headers,
+           params: { reason: "Duplicate expense submission" }
       first_response = response.parsed_body
 
-      post "/api/v1/expenses/#{expense.id}/reject", headers: headers
+      post "/api/v1/expenses/#{expense.id}/reject", headers: headers,
+           params: { reason: "Duplicate expense submission" }
 
       expect(response).to have_http_status(:ok)
       expect(response.parsed_body).to eq(first_response)
@@ -218,7 +221,7 @@ it "returns 422 with a standardized error for an invalid workflow transition" do
 
   body = response.parsed_body
   expect(body.keys).to contain_exactly("error")
-  expect(body.dig("error").keys).to contain_exactly("code", "message", "details")
+  expect(body.dig("error").keys).to contain_exactly("code", "message", "details", "request_id")
   expect(body.dig("error", "code")).to eq("invalid_transition")
   expect(body.dig("error", "message")).to eq("Invalid expense status transition")
   expect(response.body).not_to match(
@@ -245,9 +248,9 @@ end
            headers: headers
 
       expect(response).to have_http_status(:conflict)
-expect(response.parsed_body.dig("error", "code")).to eq("idempotency_conflict")
+expect(response.parsed_body.dig("error", "code")).to eq("idempotency_key_used")
 expect(response.parsed_body.dig("error", "message")).to eq(
-  "Idempotency key conflicts with an existing request"
+  "Idempotency key is already associated with another expense"
 )
 expect(response.parsed_body.dig("error")).to include("details")
 expect(response.body).not_to match(/SELECT\s+.*FROM|PG::|ActiveRecord::|app\/.*\.rb:\d+/i)
@@ -275,9 +278,9 @@ expect(response.body).not_to match(/SELECT\s+.*FROM|PG::|ActiveRecord::|app\/.*\
            params: { notes: "Different request" }
 
       expect(response).to have_http_status(:conflict)
-expect(response.parsed_body.dig("error", "code")).to eq("idempotency_conflict")
+expect(response.parsed_body.dig("error", "code")).to eq("idempotency_fingerprint_mismatch")
 expect(response.parsed_body.dig("error", "message")).to eq(
-  "Idempotency key conflicts with an existing request"
+  "Idempotency key was reused with a different request"
 )
 expect(response.parsed_body.dig("error")).to include("details")
 expect(response.body).not_to match(/SELECT\s+.*FROM|PG::|ActiveRecord::|app\/.*\.rb:\d+/i)

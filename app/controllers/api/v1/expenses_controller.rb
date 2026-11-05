@@ -30,7 +30,7 @@ module Api
         authorize expense
 
         render_success(
-          data: JSON.parse(ExpenseSerializer.new(expense).serialize)
+          data: ExpenseSerializer.new(expense).to_h
         )
       end
 
@@ -42,37 +42,23 @@ module Api
 
         authorize expense
 
-        if expense.save
-          render_success(
-            data: JSON.parse(ExpenseSerializer.new(expense).serialize),
-            status: :created
-          )
-        else
-          render_error(
-            code: "validation_error",
-            message: "Expense validation failed",
-            details: expense.errors.full_messages,
-            status: :unprocessable_entity
-          )
-        end
+        expense.save!
+
+        render_success(
+          data: ExpenseSerializer.new(expense).to_h,
+          status: :created
+        )
       end
 
       def update
         expense = policy_scope(Expense).find(params[:id])
         authorize expense
 
-        if expense.update(expense_params)
-          render_success(
-            data: JSON.parse(ExpenseSerializer.new(expense).serialize)
-          )
-        else
-          render_error(
-  code: "validation_error",
-  message: "Expense validation failed",
-  details: expense.errors.full_messages,
-  status: :unprocessable_entity
-)
-        end
+        expense.update!(expense_params)
+
+        render_success(
+          data: ExpenseSerializer.new(expense).to_h
+        )
       end
 
       def destroy
@@ -102,6 +88,16 @@ module Api
 
       private
       def process_workflow(action)
+        reason = params[:reason].to_s.strip if params[:reason].present?
+
+        if action == :reject && reason.blank?
+          raise ApiErrors::InvalidRequest, "Rejection reason is required"
+        end
+
+        if reason && reason.length > 500
+          raise ApiErrors::InvalidRequest, "Reason must not exceed 500 characters"
+        end
+
         expense = policy_scope(Expense).find(params[:id])
         authorize expense, "#{action}?".to_sym
 
@@ -136,7 +132,7 @@ module Api
           metadata: {
             request_id: request.request_id,
             ip_address: request.remote_ip,
-            reason: params[:reason]
+            reason: reason
           }.compact
         )
 
@@ -151,7 +147,7 @@ module Api
           render_error(
             code: result.error_code || "workflow_error",
             message: result.error,
-            status: result.response_status || :unprocessable_entity
+            status: result.response_status || :unprocessable_content
           )
         end
       end
@@ -191,9 +187,7 @@ module Api
                         ExpenseCursor.encode(page_records.last)
         end
 
-        serialized_expenses = JSON.parse(
-          ExpenseSerializer.new(page_records).serialize
-        )
+        serialized_expenses = ExpenseSerializer.new(page_records).to_h
 
         render_success(
           data: serialized_expenses,
@@ -214,9 +208,7 @@ module Api
           .page(page)
           .per(per_page)
 
-        serialized_expenses = JSON.parse(
-          ExpenseSerializer.new(paginated_expenses).serialize
-        )
+        serialized_expenses = ExpenseSerializer.new(paginated_expenses).to_h
 
         render_success(
           data: serialized_expenses,
