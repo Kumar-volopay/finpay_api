@@ -7,6 +7,8 @@ class ValidateCreationActivityLogValues < ActiveRecord::Migration[8.1]
 
     validate_check_constraint :activity_logs,
                                name: "activity_logs_from_state_check"
+    validate_check_constraint :activity_logs,
+                               name: "activity_logs_to_state_check"
   end
 
   def down

@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
 class Receipt < ApplicationRecord
-  attr_accessor :ocr_company_id
-
   belongs_to :expense
 
   encrypts :ocr_text
@@ -36,11 +34,15 @@ class Receipt < ApplicationRecord
   private
 
   def enqueue_ocr_processing
-    return unless ocr_company_id
+    tenant = Apartment::Tenant.current
+    return if tenant.blank? || tenant == "public"
 
-    ReceiptProcessorWorker.perform_async(
-      ocr_company_id,
-      id
-    )
+    company_id = Company.find_by(subdomain: tenant)&.id
+    unless company_id
+      Rails.logger.warn("Receipt OCR enqueue skipped: Company not found for tenant #{tenant}")
+      return
+    end
+
+    ReceiptProcessorWorker.perform_async(company_id, id)
   end
 end

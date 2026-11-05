@@ -18,13 +18,17 @@ RSpec.describe OverdueReminderWorker do
       user = create(:user)
       category = create(:category)
 
-      create(
+      expense = create(
         :expense,
         user: user,
         category: category,
         status: status,
         incurred_on: incurred_on
       )
+
+      # Simulate an expense that has been pending for the given number of days.
+      expense.update_column(:created_at, incurred_on.to_time)
+      expense
     end
   end
 
@@ -65,7 +69,6 @@ RSpec.describe OverdueReminderWorker do
       end
     end
 
-
     it "does not affect reminders in another tenant" do
       other_subdomain = tenant_subdomain("reminder_other")
       track_tenant_schema(other_subdomain)
@@ -84,13 +87,15 @@ RSpec.describe OverdueReminderWorker do
         user = create(:user)
         category = create(:category)
 
-        create(
+        expense = create(
           :expense,
           user: user,
           category: category,
           status: :pending,
           incurred_on: 8.days.ago.to_date
         )
+        expense.update_column(:created_at, 8.days.ago)
+        expense
       end
 
       described_class.new.perform(company.id)
@@ -104,13 +109,33 @@ RSpec.describe OverdueReminderWorker do
       end
     end
 
-    it "raises an error for a missing company" do
+    it "does not raise when the company is missing" do
       expect {
         described_class.new.perform(-1)
-      }.to raise_error(
-        ActiveRecord::RecordNotFound,
-        "Company not found: -1"
+      }.not_to raise_error
+    end
+
+    it "does not create more than three overdue reminders per expense" do
+      overdue = create_expense_with_status(
+        status: :pending,
+        incurred_on: 8.days.ago.to_date
       )
+
+      Apartment::Tenant.switch(company.subdomain) do
+        3.times do |index|
+          Reminder.create!(
+            expense: overdue,
+            reminder_date: (3 - index).days.ago.to_date,
+            reminder_type: "overdue"
+          )
+        end
+      end
+
+      described_class.new.perform(company.id)
+
+      Apartment::Tenant.switch(company.subdomain) do
+        expect(Reminder.where(expense_id: overdue.id).count).to eq(3)
+      end
     end
   end
 end

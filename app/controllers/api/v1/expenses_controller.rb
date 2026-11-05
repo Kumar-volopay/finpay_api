@@ -38,7 +38,6 @@ module Api
         expense = Expense.new(expense_params)
         expense.user = @current_user
         expense.status = :pending
-        expense.audit_company_id = @current_company.id
 
         authorize expense
 
@@ -65,7 +64,15 @@ module Api
         expense = policy_scope(Expense).find(params[:id])
         authorize expense
 
-        expense.destroy!
+        if expense.activity_logs.where.not(action: "create").exists?
+          return render_error(
+            code: "RECORD_NOT_DESTROYED",
+            message: "Expense cannot be cancelled because it has audit history",
+            status: :unprocessable_content
+          )
+        end
+
+        expense.cancel!
 
         head :no_content
       end
@@ -125,7 +132,6 @@ module Api
         result = ExpenseWorkflowService.call(
           expense: expense,
           actor: @current_user,
-          company_id: @current_company.id,
           action: action,
           idempotency_key: idempotency_key,
           request_fingerprint: fingerprint,

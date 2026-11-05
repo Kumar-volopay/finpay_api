@@ -12,7 +12,6 @@ on:
       - main
       - master
       - 'feature/*'
-      - 'feature/*'
 
 jobs:
   rubocop:

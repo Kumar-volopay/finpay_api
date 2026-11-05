@@ -42,10 +42,14 @@ RSpec.describe TenantWorker do
       expect(Apartment::Tenant.current).to eq("public")
     end
 
-    it "raises an error when the company does not exist" do
+    it "logs and skips when the company does not exist" do
+      expect(Rails.logger).to receive(:warn).with(
+        "TenantWorker skipped: Company not found (id: -1)"
+      )
+
       expect {
         test_worker_class.new.perform(-1)
-      }.to raise_error(ActiveRecord::RecordNotFound)
+      }.not_to raise_error
 
       expect(Apartment::Tenant.current).to eq("public")
     end

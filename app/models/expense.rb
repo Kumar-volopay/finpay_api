@@ -18,7 +18,10 @@ class Expense < ApplicationRecord
   belongs_to :category
 
   has_many :receipts, dependent: :destroy, inverse_of: :expense
+  has_many :reminders, dependent: :destroy
   has_many :activity_logs, dependent: :restrict_with_error
+
+  after_create :create_creation_activity_log
   has_many :idempotency_keys, dependent: :restrict_with_error
 
   encrypts :notes
@@ -27,7 +30,7 @@ class Expense < ApplicationRecord
        whiny_transitions: true,
        whiny_persistence: true do
     state :pending, initial: true
-    state :approved, :rejected, :reimbursed, :archived
+    state :approved, :rejected, :reimbursed, :archived, :cancelled
 
     event :approve do
       transitions from: :pending, to: :approved
@@ -44,10 +47,14 @@ class Expense < ApplicationRecord
     event :archive do
       transitions from: :reimbursed, to: :archived
     end
+  event :cancel do
+    transitions from: %i[pending approved rejected reimbursed archived],
+                to: :cancelled
+  end
   end
 
   validates :status,
-            inclusion: { in: %w[pending approved rejected reimbursed archived] }
+            inclusion: { in: %w[pending approved rejected reimbursed archived cancelled] }
   validates :title, presence: true, length: { maximum: 255 }
   validates :amount_cents,
             numericality: { only_integer: true, greater_than: 0 }
@@ -58,6 +65,16 @@ class Expense < ApplicationRecord
   scope :for_user, ->(user_id) { where(user_id: user_id) }
 
   public
+
+  def create_creation_activity_log
+    ActivityLog.create!(
+      expense: self,
+      actor: user,
+      action: "create",
+      from_state: "new",
+      to_state: status
+    )
+  end
 
   def amount_decimal
     return if amount_cents.nil? || currency.blank?
