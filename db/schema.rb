@@ -75,7 +75,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_05_064724) do
     t.check_constraint "amount_cents > 0", name: "expenses_amount_cents_positive"
     t.check_constraint "currency::text ~ '^[A-Z]{3}$'::text", name: "expenses_currency_format"
     t.check_constraint "length(TRIM(BOTH FROM title)) > 0", name: "expenses_title_not_blank"
-    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'approved'::character varying, 'rejected'::character varying, 'reimbursed'::character varying, 'archived'::character varying]::text[])", name: "expenses_status_valid"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'approved'::character varying, 'rejected'::character varying, 'reimbursed'::character varying, 'archived'::character varying, 'cancelled'::character varying]::text[])", name: "expenses_status_valid"
   end
 
   add_check_constraint "expenses", "approved_by_id IS DISTINCT FROM user_id", name: "expenses_prevent_self_approval", validate: false
