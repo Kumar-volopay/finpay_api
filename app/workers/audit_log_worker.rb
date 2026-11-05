@@ -3,25 +3,25 @@
 class AuditLogWorker < TenantWorker
   sidekiq_options queue: :critical, retry: 5
 
-  def perform_for_tenant(
-    expense_id,
-    actor_id,
-    action,
-    from_state = nil,
-    to_state = nil,
-    event_key = nil
-  )
-    expense = Expense.find(expense_id)
+  def perform_for_tenant(attributes)
+    expense_id = attributes.fetch("expense_id")
+    actor_id = attributes.fetch("actor_id")
+    action = attributes.fetch("action")
+    from_state = attributes["from_state"]
+    to_state = attributes["to_state"]
+    event_key = attributes.fetch("event_key")
 
-    # Support jobs enqueued using the previous argument format.
-    if event_key.nil?
-      event_key = action
-      action = "create"
-      from_state = "new"
-      to_state = expense.status
+    expense = Expense.find_by(id: expense_id)
+    unless expense
+      Rails.logger.warn("AuditLogWorker skipped: Expense not found (id: #{expense_id})")
+      return
     end
 
-    actor = User.find(actor_id)
+    actor = User.find_by(id: actor_id)
+    unless actor
+      Rails.logger.warn("AuditLogWorker skipped: User not found (id: #{actor_id})")
+      return
+    end
 
     ActivityLog.create_or_find_by!(event_key: event_key) do |log|
       log.expense = expense

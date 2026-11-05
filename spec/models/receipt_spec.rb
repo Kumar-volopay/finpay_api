@@ -51,23 +51,27 @@ RSpec.describe Receipt do
   end
 
   describe "OCR processing callback" do
-    it "enqueues OCR processing after receipt creation" do
-      receipt = build(:receipt)
-      receipt.ocr_company_id = 1
+    let!(:company) do
+      subdomain = tenant_subdomain("receipt_callback")
+      track_tenant_schema(subdomain)
 
-      expect(ReceiptProcessorWorker)
-        .to receive(:perform_async)
-        .with(1, kind_of(Integer))
-        .once
-
-      receipt.save!
+      Companies::Provision.call(
+        name: "Receipt Callback Spec Company",
+        subdomain: subdomain
+      )
     end
 
-    it "does not enqueue OCR processing without a company ID" do
-      expect(ReceiptProcessorWorker)
-        .not_to receive(:perform_async)
+    it "enqueues OCR processing using the current tenant company" do
+      Apartment::Tenant.switch(company.subdomain) do
+        receipt = build(:receipt)
 
-      create(:receipt)
+        expect(ReceiptProcessorWorker)
+          .to receive(:perform_async)
+          .with(company.id, kind_of(Integer))
+          .once
+
+        receipt.save!
+      end
     end
   end
 end
