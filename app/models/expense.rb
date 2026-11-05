@@ -57,6 +57,8 @@ class Expense < ApplicationRecord
 
   scope :for_user, ->(user_id) { where(user_id: user_id) }
 
+  public
+
   def amount_decimal
     return if amount_cents.nil? || currency.blank?
 
