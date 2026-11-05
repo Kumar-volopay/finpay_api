@@ -1,168 +1,78 @@
 require "rails_helper"
 
-RSpec.describe "Api::V1::Auth", type: :request do
-  before(:each) do
-    Rails.cache.clear
-  end
-
+RSpec.describe "Api::V1::Users", type: :request do
   let!(:company) do
     provision_test_tenant(
-      name: "Auth Request Spec Company",
-      prefix: "users_auth_spec"
+      name: "Users Request Spec Company",
+      prefix: "users_request"
     )
   end
 
-  let(:registration_params) do
-    {
-      subdomain: company.subdomain,
-      email: "new_member@example.com",
-      password: "TestPass123!",
-      password_confirmation: "TestPass123!"
-    }
-  end
-
-  def login_params
-    {
-      subdomain: company.subdomain,
-      email: "new_member@example.com",
-      password: "TestPass123!"
-    }
-  end
-
-  def create_member
+  let(:member) do
     Apartment::Tenant.switch(company.subdomain) do
-      create(
-        :user,
-        email: "new_member@example.com",
-        password: "TestPass123!",
-        password_confirmation: "TestPass123!"
-      )
+      create(:user, role: :member)
     end
   end
 
-  def create_invitation(email: "new_member@example.com")
+  let(:another_member) do
     Apartment::Tenant.switch(company.subdomain) do
-      admin = create(:user, role: :admin)
-
-      _invitation, raw_token = Authentication::InvitationService.create(
-        user: admin,
-        email: email
-      )
-
-      raw_token
+      create(:user, role: :member)
     end
   end
 
-  describe "POST /api/v1/auth/register" do
-    it "registers a member with a valid invitation" do
-      invitation_token = create_invitation
-
-      post "/api/v1/auth/register",
-           params: registration_params.merge(
-             invitation_token: invitation_token
-           )
-
-      expect(response).to have_http_status(:created)
-      expect(response.parsed_body.dig("user", "email"))
-        .to eq("new_member@example.com")
-      expect(response.parsed_body.dig("user", "role")).to eq("member")
-      expect(response.parsed_body["access_token"]).to be_present
-      expect(response.parsed_body["refresh_token"]).to be_present
-    end
-
-    it "returns the same error for an unknown company" do
-      post "/api/v1/auth/register",
-           params: registration_params.merge(
-             subdomain: "unknown_company",
-             invitation_token: "invalid-token"
-           )
-
-      expect(response).to have_http_status(:unauthorized)
-      expect(response.parsed_body.dig("error")).to include(
-  "code" => "invalid_invitation",
-  "message" => "Invalid invitation",
-  "details" => []
-)
-expect(response.parsed_body.dig("error", "request_id")).to be_present
-    end
-
-    it "rejects registration without an invitation" do
-      post "/api/v1/auth/register", params: registration_params
-
-      expect(response).to have_http_status(:unauthorized)
+  let(:admin) do
+    Apartment::Tenant.switch(company.subdomain) do
+      create(:user, role: :admin)
     end
   end
 
-  describe "POST /api/v1/auth/login" do
-    it "logs in a member and returns a token containing company_id" do
-      create_member
-
-      post "/api/v1/auth/login", params: login_params
+  describe "GET /api/v1/users/:id" do
+    it "allows a member to view their own profile" do
+      get "/api/v1/users/#{member.id}",
+          headers: auth_headers(member, company)
 
       expect(response).to have_http_status(:ok)
-
-      access_token = response.parsed_body["access_token"]
-      payload = Authentication::TokenService.decode(access_token)
-
-      expect(payload["company_id"]).to eq(company.id)
-      expect(response.parsed_body["refresh_token"]).to be_present
+      expect(response.parsed_body.dig("data", "id")).to eq(member.id)
+      expect(response.parsed_body.dig("data", "email")).to eq(member.email)
+      expect(response.parsed_body.dig("data", "role")).to eq("member")
     end
 
-    it "rejects invalid credentials" do
-      post "/api/v1/auth/login",
-           params: login_params.merge(password: "WrongPassword!")
+    it "prevents a member from viewing another member's profile" do
+      get "/api/v1/users/#{another_member.id}",
+          headers: auth_headers(member, company)
 
-      expect(response).to have_http_status(:unauthorized)
+      expect(response).to have_http_status(:not_found)
     end
-  end
 
-  describe "DELETE /api/v1/auth/logout" do
-    it "revokes both access and refresh tokens on logout" do
-      create_member
+    it "allows an admin to view another member's profile" do
+      get "/api/v1/users/#{another_member.id}",
+          headers: auth_headers(admin, company)
 
-      post "/api/v1/auth/login", params: login_params
       expect(response).to have_http_status(:ok)
-
-      access_token = response.parsed_body["access_token"]
-      refresh_token = response.parsed_body["refresh_token"]
-
-      delete "/api/v1/auth/logout",
-             headers: { "Authorization" => "Bearer #{access_token}" },
-             params: { refresh_token: refresh_token }
-
-      expect(response).to have_http_status(:no_content)
-
-      # Repeating logout must not cause a server error.
-      delete "/api/v1/auth/logout",
-             headers: { "Authorization" => "Bearer #{access_token}" },
-             params: { refresh_token: refresh_token }
-
-      expect(response).to have_http_status(:unauthorized)
-
-      get "/api/v1/users/1",
-          headers: { "Authorization" => "Bearer #{access_token}" }
-
-      expect(response).to have_http_status(:unauthorized)
-
-      post "/api/v1/auth/refresh",
-           params: {
-             refresh_token: refresh_token,
-             subdomain: company.subdomain
-           }
-
-      expect(response).to have_http_status(:unauthorized)
+      expect(response.parsed_body.dig("data", "id")).to eq(another_member.id)
     end
-  end
 
-  describe "rate limiting" do
-    it "blocks login requests after 10 attempts within one minute" do
-      10.times do
-        post "/api/v1/auth/login", params: login_params
+    it "prevents access to a user belonging to another tenant" do
+      other_company = provision_test_tenant(
+        name: "Other Users Company",
+        prefix: "other_users"
+      )
+
+      other_user = Apartment::Tenant.switch(other_company.subdomain) do
+        create(:user, role: :member)
+        create(:user, role: :member)
       end
 
-      post "/api/v1/auth/login", params: login_params
+      get "/api/v1/users/#{other_user.id}",
+          headers: auth_headers(member, company)
 
-      expect(response).to have_http_status(:too_many_requests)
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it "rejects an unauthenticated request" do
+      get "/api/v1/users/#{member.id}"
+
+      expect(response).to have_http_status(:unauthorized)
     end
   end
 end
