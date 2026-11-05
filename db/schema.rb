@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_05_064724) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_05_111906) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -65,8 +65,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_05_064724) do
     t.datetime "rejected_at"
     t.bigint "reimbursed_by_id"
     t.datetime "reimbursed_at"
+    t.string "reference_number"
     t.index ["approved_by_id"], name: "index_expenses_on_approved_by_id"
     t.index ["category_id"], name: "index_expenses_on_category_id"
+    t.index ["reference_number"], name: "index_expenses_on_reference_number", unique: true
     t.index ["reimbursed_by_id"], name: "index_expenses_on_reimbursed_by_id"
     t.index ["rejected_by_id"], name: "index_expenses_on_rejected_by_id"
     t.index ["user_id", "incurred_on"], name: "index_expenses_on_user_id_and_incurred_on"
@@ -75,6 +77,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_05_064724) do
     t.check_constraint "amount_cents > 0", name: "expenses_amount_cents_positive"
     t.check_constraint "currency::text ~ '^[A-Z]{3}$'::text", name: "expenses_currency_format"
     t.check_constraint "length(TRIM(BOTH FROM title)) > 0", name: "expenses_title_not_blank"
+    t.check_constraint "reference_number IS NOT NULL", name: "expenses_reference_number_not_null"
     t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'approved'::character varying, 'rejected'::character varying, 'reimbursed'::character varying, 'archived'::character varying, 'cancelled'::character varying]::text[])", name: "expenses_status_valid"
   end
 

@@ -27,7 +27,7 @@ class ExpenseWorkflowService < ApplicationService
       process_idempotency
     end
   rescue AASM::InvalidTransition
-    failure("Invalid expense status transition")
+    failure("Invalid expense status transition", code: "invalid_transition")
   rescue ActiveRecord::RecordInvalid => e
     failure(e.record.errors.full_messages.join(", "))
   end

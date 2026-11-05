@@ -81,7 +81,7 @@ RSpec.describe "Api::V1::Expenses workflow", type: :request do
            headers: admin_headers
 
       expect(response).to have_http_status(:ok)
-      expect(response.parsed_body["status"]).to eq("approved")
+      expect(response.parsed_body.dig("data", "status")).to eq("approved")
 
       Apartment::Tenant.switch(company.subdomain) do
         expect(expense.reload.approved_by_id).to eq(admin.id)
@@ -132,10 +132,11 @@ RSpec.describe "Api::V1::Expenses workflow", type: :request do
       expense = create_expense(member, category, "Rejection expense")
 
       post "/api/v1/expenses/#{expense.id}/reject",
-           headers: admin_headers
+           headers: admin_headers,
+           params: { reason: "Does not meet expense policy" }
 
       expect(response).to have_http_status(:ok)
-      expect(response.parsed_body["status"]).to eq("rejected")
+      expect(response.parsed_body.dig("data", "status")).to eq("rejected")
 
       Apartment::Tenant.switch(company.subdomain) do
         expect(expense.reload.rejected_by_id).to eq(admin.id)
@@ -148,10 +149,12 @@ RSpec.describe "Api::V1::Expenses workflow", type: :request do
       expense = create_expense(member, category, "Replay rejection")
       headers = admin_headers.merge("Idempotency-Key" => "workflow-reject-replay-001")
 
-      post "/api/v1/expenses/#{expense.id}/reject", headers: headers
+      post "/api/v1/expenses/#{expense.id}/reject", headers: headers,
+           params: { reason: "Duplicate expense submission" }
       first_response = response.parsed_body
 
-      post "/api/v1/expenses/#{expense.id}/reject", headers: headers
+      post "/api/v1/expenses/#{expense.id}/reject", headers: headers,
+           params: { reason: "Duplicate expense submission" }
 
       expect(response).to have_http_status(:ok)
       expect(response.parsed_body).to eq(first_response)
@@ -172,7 +175,7 @@ RSpec.describe "Api::V1::Expenses workflow", type: :request do
            headers: admin_headers.merge("Idempotency-Key" => "workflow-reimburse-001")
 
       expect(response).to have_http_status(:ok)
-      expect(response.parsed_body["status"]).to eq("reimbursed")
+      expect(response.parsed_body.dig("data", "status")).to eq("reimbursed")
 
       Apartment::Tenant.switch(company.subdomain) do
         expect(expense.reload.reimbursed_by_id).to eq(admin.id)
@@ -205,7 +208,28 @@ RSpec.describe "Api::V1::Expenses workflow", type: :request do
     end
 
 
-    it "returns 422 when the same key is used for another expense" do
+it "returns 422 with a standardized error for an invalid workflow transition" do
+  expense = create_expense(
+    member, category, "Pending reimbursement", status: :pending
+  )
+
+  headers = admin_headers.merge("Idempotency-Key" => "invalid-transition-001")
+
+  post "/api/v1/expenses/#{expense.id}/reimburse", headers: headers
+
+  expect(response).to have_http_status(:unprocessable_content)
+
+  body = response.parsed_body
+  expect(body.keys).to contain_exactly("error")
+  expect(body.dig("error").keys).to contain_exactly("code", "message", "details", "request_id")
+  expect(body.dig("error", "code")).to eq("invalid_transition")
+  expect(body.dig("error", "message")).to eq("Invalid expense status transition")
+  expect(response.body).not_to match(
+    /SELECT\s+.*FROM|PG::|ActiveRecord::|app\/.*\.rb:\d+/i
+  )
+end
+
+    it "returns 409 when the same key is used for another expense" do
       first_expense = create_expense(
         member, category, "First reimbursement", status: :approved
       )
@@ -223,14 +247,20 @@ RSpec.describe "Api::V1::Expenses workflow", type: :request do
       post "/api/v1/expenses/#{second_expense.id}/reimburse",
            headers: headers
 
-      expect(response).to have_http_status(:unprocessable_content)
+      expect(response).to have_http_status(:conflict)
+expect(response.parsed_body.dig("error", "code")).to eq("idempotency_key_used")
+expect(response.parsed_body.dig("error", "message")).to eq(
+  "Idempotency key is already associated with another expense"
+)
+expect(response.parsed_body.dig("error")).to include("details")
+expect(response.body).not_to match(/SELECT\s+.*FROM|PG::|ActiveRecord::|app\/.*\.rb:\d+/i)
 
       Apartment::Tenant.switch(company.subdomain) do
         expect(second_expense.reload).to be_approved
       end
     end
 
-    it "returns 422 when the same key is reused with a different request" do
+    it "returns 409 when the same key is reused with a different request" do
       expense = create_expense(
         member, category, "Different payload reimbursement", status: :approved
       )
@@ -247,7 +277,13 @@ RSpec.describe "Api::V1::Expenses workflow", type: :request do
            headers: headers,
            params: { notes: "Different request" }
 
-      expect(response).to have_http_status(:unprocessable_content)
+      expect(response).to have_http_status(:conflict)
+expect(response.parsed_body.dig("error", "code")).to eq("idempotency_fingerprint_mismatch")
+expect(response.parsed_body.dig("error", "message")).to eq(
+  "Idempotency key was reused with a different request"
+)
+expect(response.parsed_body.dig("error")).to include("details")
+expect(response.body).not_to match(/SELECT\s+.*FROM|PG::|ActiveRecord::|app\/.*\.rb:\d+/i)
 
       Apartment::Tenant.switch(company.subdomain) do
         expect(expense.reload).to be_reimbursed
@@ -267,7 +303,7 @@ RSpec.describe "Api::V1::Expenses workflow", type: :request do
            headers: admin_headers
 
       expect(response).to have_http_status(:bad_request)
-      expect(response.parsed_body["error"]).to eq(
+      expect(response.parsed_body.dig("error", "message")).to eq(
         "Idempotency key is required"
       )
     end
@@ -342,7 +378,7 @@ RSpec.describe "Api::V1::Expenses workflow", type: :request do
            headers: admin_headers
 
       expect(response).to have_http_status(:ok)
-      expect(response.parsed_body["status"]).to eq("archived")
+      expect(response.parsed_body.dig("data", "status")).to eq("archived")
 
       Apartment::Tenant.switch(company.subdomain) do
         expect(expense.reload).to be_archived

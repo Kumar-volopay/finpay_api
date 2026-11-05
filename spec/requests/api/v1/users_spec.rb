@@ -6,9 +6,9 @@ RSpec.describe "Api::V1::Auth", type: :request do
   end
 
   let!(:company) do
-    Companies::Provision.call(
+    provision_test_tenant(
       name: "Auth Request Spec Company",
-      subdomain: "auth_request_spec"
+      prefix: "users_auth_spec"
     )
   end
 
@@ -78,9 +78,12 @@ RSpec.describe "Api::V1::Auth", type: :request do
            )
 
       expect(response).to have_http_status(:unauthorized)
-      expect(response.parsed_body).to eq(
-        "error" => "Invalid invitation"
-      )
+      expect(response.parsed_body.dig("error")).to include(
+  "code" => "invalid_invitation",
+  "message" => "Invalid invitation",
+  "details" => []
+)
+expect(response.parsed_body.dig("error", "request_id")).to be_present
     end
 
     it "rejects registration without an invitation" do

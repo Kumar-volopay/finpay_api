@@ -3,6 +3,14 @@
 class Expense < ApplicationRecord
   include AASM
 
+  before_create :assign_reference_number
+
+  validates :reference_number, uniqueness: true, allow_nil: true
+
+  attr_accessor :audit_company_id
+
+  after_create_commit :enqueue_creation_audit
+
   belongs_to :user
   belongs_to :approved_by, class_name: "User", optional: true
   belongs_to :rejected_by, class_name: "User", optional: true
@@ -56,8 +64,7 @@ class Expense < ApplicationRecord
 
   scope :for_user, ->(user_id) { where(user_id: user_id) }
 
-
-  private
+  public
 
   def create_creation_activity_log
     ActivityLog.create!(
@@ -79,5 +86,27 @@ class Expense < ApplicationRecord
 
     "#{whole}.#{fraction.to_s.rjust(digits, '0')}"
   end
-  public :amount_decimal
+
+  private
+
+  def assign_reference_number
+    return if reference_number.present?
+
+    self.id ||= self.class.connection.select_value(
+      "SELECT nextval(pg_get_serial_sequence('expenses', 'id')::regclass)"
+    )
+
+    self.reference_number = "EXP-#{id}"
+  end
+
+  def enqueue_creation_audit
+    return unless audit_company_id
+
+    AuditLogWorker.perform_async(
+      audit_company_id,
+      id,
+      user_id,
+      "expense:#{id}:created:v1"
+    )
+  end
 end

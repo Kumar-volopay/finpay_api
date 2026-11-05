@@ -412,6 +412,7 @@ GEM
 
 PLATFORMS
   arm64-darwin-23
+  arm64-darwin-25
   x64-mingw-ucrt
   x86_64-linux
 
@@ -600,7 +601,7 @@ CHECKSUMS
   zeitwerk (2.8.3) sha256=2c85125a8467ce069e20123d1e709a08955c9d29c118c25b46b7b7fafdbb92e5
 
 RUBY VERSION
-  ruby 4.0.7
+  ruby 3.4.12
 
 BUNDLED WITH
   4.0.23
