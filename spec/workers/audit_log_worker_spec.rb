@@ -27,14 +27,16 @@ RSpec.describe AuditLogWorker do
       event_key = "expense:#{expense.id}:created:v1"
 
       described_class.new.perform(
-        company.id,
-        expense.id,
-        expense.user_id,
-        "create",
-        "new",
-        expense.status,
-        event_key
-      )
+          company.id,
+          {
+            "expense_id" => expense.id,
+            "actor_id" => expense.user_id,
+            "action" => "create",
+            "from_state" => "new",
+            "to_state" => expense.status,
+            "event_key" => event_key
+          }
+        )
 
       Apartment::Tenant.switch(company.subdomain) do
         log = ActivityLog.find_by!(event_key: event_key)
@@ -51,12 +53,14 @@ RSpec.describe AuditLogWorker do
       2.times do
         described_class.new.perform(
           company.id,
-          expense.id,
-          expense.user_id,
-          "create",
-          "new",
-          expense.status,
-          event_key
+          {
+            "expense_id" => expense.id,
+            "actor_id" => expense.user_id,
+            "action" => "create",
+            "from_state" => "new",
+            "to_state" => expense.status,
+            "event_key" => event_key
+          }
         )
       end
 

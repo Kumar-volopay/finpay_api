@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_04_120001) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_05_064724) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -21,7 +21,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_04_120001) do
     t.string "from_state", null: false
     t.string "to_state", null: false
     t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
     t.string "event_key"
     t.jsonb "metadata", default: {}, null: false
     t.index ["actor_id"], name: "index_activity_logs_on_actor_id"
@@ -76,7 +75,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_04_120001) do
     t.check_constraint "amount_cents > 0", name: "expenses_amount_cents_positive"
     t.check_constraint "currency::text ~ '^[A-Z]{3}$'::text", name: "expenses_currency_format"
     t.check_constraint "length(TRIM(BOTH FROM title)) > 0", name: "expenses_title_not_blank"
-    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'approved'::character varying::text, 'rejected'::character varying::text, 'reimbursed'::character varying::text, 'archived'::character varying::text])", name: "expenses_status_valid"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'approved'::character varying, 'rejected'::character varying, 'reimbursed'::character varying, 'archived'::character varying]::text[])", name: "expenses_status_valid"
   end
 
   add_check_constraint "expenses", "approved_by_id IS DISTINCT FROM user_id", name: "expenses_prevent_self_approval", validate: false
@@ -156,6 +155,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_04_120001) do
     t.datetime "updated_at", null: false
     t.index ["expense_id", "reminder_date", "reminder_type"], name: "index_reminders_on_expense_date_and_type", unique: true
     t.index ["expense_id"], name: "index_reminders_on_expense_id"
+    t.check_constraint "reminder_type::text = 'overdue'::text", name: "reminders_type_check"
   end
 
   create_table "users", force: :cascade do |t|

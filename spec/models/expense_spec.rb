@@ -130,4 +130,18 @@ RSpec.describe Expense do
       expect { expense.archive! }.to raise_error(AASM::InvalidTransition)
     end
   end
+
+  it "creates exactly one activity log when an expense is created directly" do
+    expense = build(:expense)
+
+    expect {
+      expense.save!
+    }.to change(ActivityLog, :count).by(1)
+
+    log = ActivityLog.find_by!(expense: expense)
+    expect(log.action).to eq("create")
+    expect(log.from_state).to eq("new")
+    expect(log.to_state).to eq("pending")
+    expect(log.actor).to eq(expense.user)
+  end
 end

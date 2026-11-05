@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class TenantWorker
   include Sidekiq::Job
 
@@ -6,8 +8,10 @@ class TenantWorker
   def perform(company_id, *args)
     company = Company.find_by(id: company_id)
 
-    raise ActiveRecord::RecordNotFound,
-          "Company not found: #{company_id}" unless company
+    unless company
+      Rails.logger.warn("TenantWorker skipped: Company not found (id: #{company_id})")
+      return
+    end
 
     Apartment::Tenant.switch(company.subdomain) do
       perform_for_tenant(*args)

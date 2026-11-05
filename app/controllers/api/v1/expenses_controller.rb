@@ -41,7 +41,6 @@ module Api
         expense = Expense.new(expense_params)
         expense.user = @current_user
         expense.status = :pending
-        expense.audit_company_id = @current_company.id
 
         authorize expense
 
@@ -71,7 +70,7 @@ module Api
         expense = policy_scope(Expense).find(params[:id])
         authorize expense
 
-        expense.destroy!
+        expense.cancel!
 
         head :no_content
       end
@@ -118,7 +117,6 @@ module Api
         result = ExpenseWorkflowService.call(
           expense: expense,
           actor: @current_user,
-          company_id: @current_company.id,
           action: action,
           idempotency_key: idempotency_key,
           request_fingerprint: fingerprint,

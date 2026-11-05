@@ -181,23 +181,26 @@ RSpec.describe "Api::V1::Expenses", type: :request do
   end
 
   describe "POST /api/v1/expenses" do
-    it "creates an expense for the authenticated member" do
-      expect(AuditLogWorker).to receive(:perform_async).with(
-        company.id,
-        kind_of(Integer),
-        member.id,
-        match(/\Aexpense:\d+:created:v1\z/)
-      )
-
+    it "creates an expense and exactly one activity log for the authenticated member" do
       expect {
         post "/api/v1/expenses",
              params: expense_params,
              headers: headers
       }.to change { tenant_expense_count }.by(1)
+        .and change { Apartment::Tenant.switch(company.subdomain) { ActivityLog.count } }.by(1)
 
       expect(response).to have_http_status(:created)
       expect(response.parsed_body["status"]).to eq("pending")
       expect(response.parsed_body["user_id"]).to eq(member.id)
+
+      log = Apartment::Tenant.switch(company.subdomain) do
+        ActivityLog.order(:id).last
+      end
+
+      expect(log.actor_id).to eq(member.id)
+      expect(log.action).to eq("create")
+      expect(log.from_state).to eq("new")
+      expect(log.to_state).to eq("pending")
     end
 
     it "does not allow the client to override user_id or status" do
@@ -215,8 +218,10 @@ RSpec.describe "Api::V1::Expenses", type: :request do
       expect(response.parsed_body["status"]).to eq("pending")
     end
 
-    it "does not enqueue an audit job when expense creation fails" do
-      expect(AuditLogWorker).not_to receive(:perform_async)
+    it "does not create an activity log when expense creation fails" do
+      activity_log_count = Apartment::Tenant.switch(company.subdomain) do
+        ActivityLog.count
+      end
 
       post "/api/v1/expenses",
            params: {
@@ -231,6 +236,9 @@ RSpec.describe "Api::V1::Expenses", type: :request do
            headers: headers
 
       expect(response).to have_http_status(:unprocessable_entity)
+      expect(
+        Apartment::Tenant.switch(company.subdomain) { ActivityLog.count }
+      ).to eq(activity_log_count)
     end
   end
 
@@ -266,13 +274,17 @@ RSpec.describe "Api::V1::Expenses", type: :request do
   end
 
   describe "DELETE /api/v1/expenses/:id" do
-    it "deletes the member's own pending expense" do
+    it "cancels the member's own pending expense and preserves it" do
       expect {
-        delete "/api/v1/expenses/#{own_expense.id}",
-               headers: headers
-      }.to change { tenant_expense_count }.by(-1)
+        delete "/api/v1/expenses/#{own_expense.id}", headers: headers
+      }.not_to change { tenant_expense_count }
 
+      puts "DELETE RESPONSE: #{response.body}"
       expect(response).to have_http_status(:no_content)
+
+      Apartment::Tenant.switch(company.subdomain) do
+        expect(Expense.find(own_expense.id)).to be_cancelled
+      end
     end
 
     it "prevents deleting another member's expense" do

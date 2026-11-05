@@ -101,7 +101,7 @@ RSpec.describe "Api::V1::Expenses workflow", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response.parsed_body).to eq(first_response)
       expect(response.headers["Idempotent-Replayed"]).to eq("true")
-      expect(tenant_activity_log_count(expense)).to eq(1)
+      expect(tenant_activity_log_count(expense)).to eq(2)
     end
 
     it "prevents an admin from approving their own expense" do
@@ -156,7 +156,7 @@ RSpec.describe "Api::V1::Expenses workflow", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response.parsed_body).to eq(first_response)
       expect(response.headers["Idempotent-Replayed"]).to eq("true")
-      expect(tenant_activity_log_count(expense)).to eq(1)
+      expect(tenant_activity_log_count(expense)).to eq(2)
     end
 
   describe "POST /api/v1/expenses/:id/reimburse" do
@@ -330,7 +330,7 @@ RSpec.describe "Api::V1::Expenses workflow", type: :request do
 
       Apartment::Tenant.switch(other_company.subdomain) do
         expect(other_expense.reload).to be_pending
-        expect(ActivityLog.where(expense: other_expense)).to be_empty
+        expect(ActivityLog.where(expense: other_expense).pluck(:action)).to eq([ "create" ])
       end
     end
 

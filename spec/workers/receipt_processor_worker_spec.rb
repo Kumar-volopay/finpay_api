@@ -43,10 +43,10 @@ RSpec.describe ReceiptProcessorWorker do
         )
       end
 
-      expect_any_instance_of(described_class)
-        .not_to receive(:simulate_ocr)
+      worker = described_class.new
+      expect(worker).not_to receive(:simulate_ocr)
 
-      described_class.new.perform(company.id, receipt.id)
+      worker.perform(company.id, receipt.id)
 
       Apartment::Tenant.switch(company.subdomain) do
         expect(Receipt.find(receipt.id).ocr_text)
@@ -55,12 +55,13 @@ RSpec.describe ReceiptProcessorWorker do
     end
 
     it "marks the receipt as failed when OCR processing raises an error" do
-      allow_any_instance_of(described_class)
+      worker = described_class.new
+      allow(worker)
         .to receive(:simulate_ocr)
         .and_raise(StandardError, "OCR processing failed")
 
       expect {
-        described_class.new.perform(company.id, receipt.id)
+        worker.perform(company.id, receipt.id)
       }.to raise_error(StandardError, "OCR processing failed")
 
       Apartment::Tenant.switch(company.subdomain) do
@@ -68,10 +69,14 @@ RSpec.describe ReceiptProcessorWorker do
       end
     end
 
-    it "raises an error when the receipt does not exist" do
+    it "logs and skips when the receipt does not exist" do
+      expect(Rails.logger).to receive(:warn).with(
+        "ReceiptProcessorWorker skipped: Receipt not found (id: -1)"
+      )
+
       expect {
         described_class.new.perform(company.id, -1)
-      }.to raise_error(ActiveRecord::RecordNotFound)
+      }.not_to raise_error
     end
   end
 end
