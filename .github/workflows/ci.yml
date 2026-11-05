@@ -2,8 +2,17 @@
 name: CI
 
 on:
-  pull_request:
+  push:
+    branches:
+      - main
+      - master
+      - 'feature/*'
 
+  pull_request:
+    branches:
+      - main
+      - master
+      - 'feature/*'
 
 jobs:
   rubocop:

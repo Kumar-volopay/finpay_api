@@ -4,6 +4,7 @@ source "https://rubygems.org"
 gem "rails", "~> 8.1.4"
 # Use postgresql as the database for Active Record
 gem "pg", "~> 1.1"
+gem "aasm", "~> 6.0"
 # Use the Puma web server [https://github.com/puma/puma]
 gem "puma", ">= 5.0"
 
@@ -64,6 +65,8 @@ group :development, :test do
   gem "simplecov", require: false
 
   gem "dotenv-rails"
+
+  gem "bullet"
 end
 
 gem "ros-apartment", "~> 3.4", require: "apartment"
@@ -75,3 +78,5 @@ ruby "4.0.7"
 gem "devise", "~> 5.0"
 gem "devise-jwt", "~> 0.13.0"
 gem "pundit", "~> 2.5"
+
+gem "kaminari"
