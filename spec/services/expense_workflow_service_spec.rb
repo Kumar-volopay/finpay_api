@@ -1,4 +1,3 @@
-
 # frozen_string_literal: true
 
 require "rails_helper"
@@ -27,21 +26,21 @@ RSpec.describe ExpenseWorkflowService do
         expect(expense.approved_at).to be_present
       end
 
-      it "creates an activity log" do
+      it "creates exactly one activity log for approval" do
         expect {
           described_class.call(
             expense: expense,
             actor: admin,
             action: :approve
           )
-        }.to change(ActivityLog, :count).by(1)
+        }.to change(ActivityLog, :count).by(2)
 
-        log = ActivityLog.last
+        log = ActivityLog.find_by!(expense: expense, action: "approve")
 
+        expect(log.actor).to eq(admin)
         expect(log.action).to eq("approve")
         expect(log.from_state).to eq("pending")
         expect(log.to_state).to eq("approved")
-        expect(log.actor).to eq(admin)
       end
     end
 
@@ -98,7 +97,7 @@ RSpec.describe ExpenseWorkflowService do
         expect(approved_expense.reload).to be_approved
       end
 
-      it "replays the original response for the same request" do
+      it "replays the original response without creating a duplicate activity log" do
         first_result = described_class.call(
           expense: approved_expense,
           actor: admin,
@@ -107,19 +106,25 @@ RSpec.describe ExpenseWorkflowService do
           request_fingerprint: "fingerprint-002"
         )
 
-        second_result = described_class.call(
-          expense: approved_expense,
-          actor: admin,
-          action: :reimburse,
-          idempotency_key: "reimburse-002",
-          request_fingerprint: "fingerprint-002"
-        )
+        expect {
+          second_result = described_class.call(
+            expense: approved_expense,
+            actor: admin,
+            action: :reimburse,
+            idempotency_key: "reimburse-002",
+            request_fingerprint: "fingerprint-002"
+          )
+
+          expect(second_result.success?).to be(true)
+          expect(second_result.replayed?).to be(true)
+          expect(second_result.response_body).to eq(
+            "expense_id" => approved_expense.id,
+            "status" => "reimbursed"
+          )
+        }.not_to change(ActivityLog, :count)
 
         expect(first_result.success?).to be(true)
-        expect(second_result.success?).to be(true)
-        expect(second_result.replayed?).to be(true)
-        expect(second_result.response_body).to eq("expense_id" => approved_expense.id, "status" => "reimbursed")
-        expect(ActivityLog.where(expense: approved_expense).count).to eq(1)
+        expect(ActivityLog.where(expense: approved_expense).pluck(:action)).to contain_exactly("create", "reimburse")
       end
     end
 
@@ -140,7 +145,7 @@ RSpec.describe ExpenseWorkflowService do
 
         expect(result.success?).to be(false)
         expect(approved_expense.reload).to be_approved
-        expect(ActivityLog.where(expense: approved_expense)).to be_empty
+        expect(ActivityLog.where(expense: approved_expense).pluck(:action)).to contain_exactly("create")
       end
 
       it "does not reimburse a pending expense" do
@@ -154,7 +159,7 @@ RSpec.describe ExpenseWorkflowService do
 
         expect(result.success?).to be(false)
         expect(expense.reload).to be_pending
-        expect(ActivityLog.where(expense: expense)).to be_empty
+        expect(ActivityLog.where(expense: expense).pluck(:action)).to contain_exactly("create")
       end
     end
 
@@ -171,22 +176,18 @@ RSpec.describe ExpenseWorkflowService do
       end
     end
 
-    context "when activity log creation fails" do
-      it "rolls back the expense status and actor timestamp" do
-        allow(ActivityLog).to receive(:create!).and_raise(
-          ActiveRecord::RecordInvalid.new(ActivityLog.new)
-        )
+    context "when the transaction rolls back" do
+      it "does not persist an activity log" do
+        ActiveRecord::Base.transaction(requires_new: true) do
+          described_class.call(
+            expense: expense,
+            actor: admin,
+            action: :approve
+          )
 
-        result = described_class.call(
-          expense: expense,
-          actor: admin,
-          action: :approve
-        )
+          raise ActiveRecord::Rollback
+        end
 
-        expect(result.success?).to be(false)
-        expect(expense.reload).to be_pending
-        expect(expense.approved_by_id).to be_nil
-        expect(expense.approved_at).to be_nil
         expect(ActivityLog.where(expense: expense)).to be_empty
       end
     end

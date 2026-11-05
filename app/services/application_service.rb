@@ -3,7 +3,7 @@
 class ApplicationService
   Result = Struct.new(
     :success, :data, :error, :replayed,
-    :response_status, :response_body, :record,
+    :response_status, :response_body, :record, :error_code,
     keyword_init: true
   ) do
     def success?
@@ -30,13 +30,14 @@ class ApplicationService
     }.merge(attributes))
   end
 
-  def failure(error, status: 422)
+  def failure(error, status: 422, code: nil)
     Result.new(
       success: false,
       data: nil,
       error: error,
       replayed: false,
-      response_status: status
+      response_status: status,
+      error_code: code
     )
   end
 end

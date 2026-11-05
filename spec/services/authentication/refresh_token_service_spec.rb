@@ -4,16 +4,16 @@ require "digest"
 
 RSpec.describe Authentication::RefreshTokenService do
   let!(:company) do
-    Companies::Provision.call(
+    provision_test_tenant(
       name: "Refresh Spec Company",
-      subdomain: "refresh_spec_company"
+      prefix: "refresh_spec"
     )
   end
 
   let!(:other_company) do
-    Companies::Provision.call(
+    provision_test_tenant(
       name: "Other Refresh Spec Company",
-      subdomain: "other_refresh_spec"
+      prefix: "other_refresh"
     )
   end
 

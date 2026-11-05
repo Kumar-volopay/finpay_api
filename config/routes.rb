@@ -1,4 +1,29 @@
+require "ipaddr"
+
 Rails.application.routes.draw do
+  if Rails.env.production?
+    allowed_ips = ENV.fetch("SIDEKIQ_ALLOWED_IPS", "")
+                     .split(",")
+                     .filter_map do |ip|
+      IPAddr.new(ip.strip)
+    rescue IPAddr::InvalidAddressError
+      nil
+    end
+
+    constraints lambda { |request|
+      begin
+        client_ip = IPAddr.new(request.remote_ip)
+        allowed_ips.any? { |allowed_ip| allowed_ip.include?(client_ip) }
+      rescue IPAddr::InvalidAddressError
+        false
+      end
+    } do
+      mount Sidekiq::Web => "/sidekiq"
+    end
+  else
+    mount Sidekiq::Web => "/sidekiq"
+  end
+
   get "up" => "rails/health#show", as: :rails_health_check
 
   namespace :api do
@@ -11,7 +36,6 @@ Rails.application.routes.draw do
           post :archive
         end
       end
-
       post "auth/register", to: "auth#register"
       post "auth/login", to: "auth#login"
       delete "auth/logout", to: "auth#logout"

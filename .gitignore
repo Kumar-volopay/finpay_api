@@ -47,3 +47,6 @@
 
 # Ignore generated RSpec example status
 /spec/examples.txt
+
+# Ignore macOS Finder metadata
+.DS_Store
