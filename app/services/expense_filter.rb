@@ -40,18 +40,18 @@ class ExpenseFilter
     unknown_filters = @params.keys - ALLOWED_FILTERS
 
     if unknown_filters.any?
-      raise ArgumentError, "Unknown filters: #{unknown_filters.join(', ')}"
+      raise ApiErrors::InvalidRequest, "Unknown filters: #{unknown_filters.join(', ')}"
     end
 
     if status.present? && !ALLOWED_STATUSES.include?(status)
-      raise ArgumentError, "Invalid expense status"
+      raise ApiErrors::InvalidRequest, "Invalid expense status"
     end
 
     validate_date!(:from)
     validate_date!(:to)
 
     if from_date && to_date && from_date > to_date
-      raise ArgumentError, "From date cannot be after to date"
+      raise ApiErrors::InvalidRequest, "From date cannot be after to date"
     end
   end
 
@@ -59,7 +59,7 @@ class ExpenseFilter
     return if @params["category_id"].blank?
 
     value = @params["category_id"]
-    raise ArgumentError, "Invalid category_id" unless value.to_s.match?(/\A[1-9]\d*\z/)
+    raise ApiErrors::InvalidRequest, "Invalid category_id" unless value.to_s.match?(/\A[1-9]\d*\z/)
 
     value.to_i
   end
@@ -81,12 +81,12 @@ class ExpenseFilter
     return if value.blank?
 
     unless value.match?(DATE_FORMAT)
-      raise ArgumentError, "Invalid #{key} date"
+      raise ApiErrors::InvalidRequest, "Invalid #{key} date"
     end
 
     parsed_date = Date.iso8601(value)
     instance_variable_set("@#{key}_date", parsed_date)
   rescue Date::Error
-    raise ArgumentError, "Invalid #{key} date"
+    raise ApiErrors::InvalidRequest, "Invalid #{key} date"
   end
 end

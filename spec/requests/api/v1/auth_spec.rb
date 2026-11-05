@@ -10,9 +10,9 @@ RSpec.describe "Api::V1::Auth", type: :request do
   end
 
   let!(:company) do
-    Companies::Provision.call(
+    provision_test_tenant(
       name: "Auth Request Spec Company",
-      subdomain: "auth_request_spec"
+      prefix: "auth_spec"
     )
   end
 
@@ -82,9 +82,12 @@ RSpec.describe "Api::V1::Auth", type: :request do
            )
 
       expect(response).to have_http_status(:unauthorized)
-      expect(response.parsed_body).to eq(
-        "error" => "Invalid invitation"
-      )
+      expect(response.parsed_body.dig("error")).to include(
+  "code" => "invalid_invitation",
+  "message" => "Invalid invitation",
+  "details" => []
+)
+expect(response.parsed_body.dig("error", "request_id")).to be_present
     end
 
     it "rejects registration without an invitation" do
@@ -127,9 +130,61 @@ RSpec.describe "Api::V1::Auth", type: :request do
            params: login_params.merge(email: "unknown@example.com")
 
       expect(response).to have_http_status(:unauthorized)
-      expect(response.parsed_body).to eq(
-        "error" => "Invalid credentials"
+      expect(response.parsed_body.dig("error")).to include(
+  "code" => "invalid_credentials",
+  "message" => "Invalid credentials",
+  "details" => []
+)
+expect(response.parsed_body.dig("error", "request_id")).to be_present
+    end
+  end
+
+  describe "protected endpoint token validation" do
+    it "rejects an expired access token" do
+      user = create_member
+
+      expired_token = Authentication::TokenService.encode(
+        user: user,
+        company_id: company.id
       )
+
+      payload = JWT.decode(expired_token, nil, false).first
+      expired_token = JWT.encode(
+        payload.merge("exp" => 1.minute.ago.to_i),
+        Rails.application.credentials.dig(:jwt, :secret_key),
+        "HS256"
+      )
+
+      get "/api/v1/users/#{user.id}",
+          headers: { "Authorization" => "Bearer #{expired_token}" }
+
+      expect(response).to have_http_status(:unauthorized)
+      expect(response.parsed_body.dig("error", "code")).to eq("token_expired")
+    end
+
+    it "rejects an invalid access token" do
+      get "/api/v1/users/1",
+          headers: { "Authorization" => "Bearer invalid-token" }
+
+      expect(response).to have_http_status(:unauthorized)
+      expect(response.parsed_body.dig("error", "code")).to eq("invalid_token")
+    end
+
+    it "rejects an access token belonging to a disabled user" do
+      user = create_member
+      access_token = Authentication::TokenService.encode(
+        user: user,
+        company_id: company.id
+      )
+
+      Apartment::Tenant.switch(company.subdomain) do
+        user.update!(disabled_at: Time.current)
+      end
+
+      get "/api/v1/users/#{user.id}",
+          headers: { "Authorization" => "Bearer #{access_token}" }
+
+      expect(response).to have_http_status(:unauthorized)
     end
   end
 

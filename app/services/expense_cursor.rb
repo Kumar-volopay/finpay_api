@@ -18,14 +18,14 @@ class ExpenseCursor
     created_at = Time.iso8601(data.fetch("created_at"))
     id = Integer(data.fetch("id"))
 
-    raise ArgumentError, "Invalid cursor" unless id.positive?
+    raise ApiErrors::InvalidRequest, "Invalid cursor" unless id.positive?
 
     {
       created_at: created_at,
       id: id
     }
   rescue ArgumentError, KeyError, JSON::ParserError, TypeError
-    raise ArgumentError, "Invalid cursor"
+    raise ApiErrors::InvalidRequest, "Invalid cursor"
   end
 
   def self.apply(scope, cursor)

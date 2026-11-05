@@ -49,4 +49,29 @@ RSpec.describe Receipt do
     expect(stored_value).not_to eq("Extracted receipt text")
     expect(receipt.reload.ocr_text).to eq("Extracted receipt text")
   end
+
+  describe "OCR processing callback" do
+    let!(:company) do
+      subdomain = tenant_subdomain("receipt_callback")
+      track_tenant_schema(subdomain)
+
+      Companies::Provision.call(
+        name: "Receipt Callback Spec Company",
+        subdomain: subdomain
+      )
+    end
+
+    it "enqueues OCR processing using the current tenant company" do
+      Apartment::Tenant.switch(company.subdomain) do
+        receipt = build(:receipt)
+
+        expect(ReceiptProcessorWorker)
+          .to receive(:perform_async)
+          .with(company.id, kind_of(Integer))
+          .once
+
+        receipt.save!
+      end
+    end
+  end
 end

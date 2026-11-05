@@ -9,6 +9,9 @@ abort("The Rails environment is running in production mode!") if Rails.env.produ
 
 require 'rspec/rails'
 
+Sidekiq.testing!(:fake)
+
+
 # Load shared support files
 Rails.root.glob('spec/support/**/*.rb').sort_by(&:to_s).each { |f| require f }
 
@@ -34,6 +37,7 @@ RSpec.configure do |config|
   config.filter_rails_from_backtrace!
 
   config.before(:each) do
+    Sidekiq::Worker.clear_all
     Rails.cache.clear
     Bullet.start_request
   end

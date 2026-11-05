@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_04_095355) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_05_111906) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -21,16 +21,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_04_095355) do
     t.string "from_state", null: false
     t.string "to_state", null: false
     t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
     t.string "event_key"
     t.jsonb "metadata", default: {}, null: false
     t.index ["actor_id"], name: "index_activity_logs_on_actor_id"
     t.index ["event_key"], name: "index_activity_logs_on_event_key", unique: true
     t.index ["expense_id", "created_at"], name: "index_activity_logs_on_expense_id_and_created_at"
+    t.check_constraint "action::text = ANY (ARRAY['create'::character varying, 'approve'::character varying, 'reject'::character varying, 'reimburse'::character varying, 'archive'::character varying]::text[])", name: "activity_logs_action_check"
+    t.check_constraint "from_state::text = ANY (ARRAY['new'::character varying, 'pending'::character varying, 'approved'::character varying, 'rejected'::character varying, 'reimbursed'::character varying, 'archived'::character varying]::text[])", name: "activity_logs_from_state_check"
   end
 
-  add_check_constraint "activity_logs", "action::text = ANY (ARRAY['approve'::character varying, 'reject'::character varying, 'reimburse'::character varying, 'archive'::character varying]::text[])", name: "activity_logs_action_check", validate: false
-  add_check_constraint "activity_logs", "from_state::text = ANY (ARRAY['pending'::character varying, 'approved'::character varying, 'rejected'::character varying, 'reimbursed'::character varying, 'archived'::character varying]::text[])", name: "activity_logs_from_state_check", validate: false
   add_check_constraint "activity_logs", "to_state::text = ANY (ARRAY['pending'::character varying, 'approved'::character varying, 'rejected'::character varying, 'reimbursed'::character varying, 'archived'::character varying]::text[])", name: "activity_logs_to_state_check", validate: false
 
   create_table "categories", force: :cascade do |t|
@@ -66,8 +65,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_04_095355) do
     t.datetime "rejected_at"
     t.bigint "reimbursed_by_id"
     t.datetime "reimbursed_at"
+    t.string "reference_number"
     t.index ["approved_by_id"], name: "index_expenses_on_approved_by_id"
     t.index ["category_id"], name: "index_expenses_on_category_id"
+    t.index ["reference_number"], name: "index_expenses_on_reference_number", unique: true
     t.index ["reimbursed_by_id"], name: "index_expenses_on_reimbursed_by_id"
     t.index ["rejected_by_id"], name: "index_expenses_on_rejected_by_id"
     t.index ["user_id", "incurred_on"], name: "index_expenses_on_user_id_and_incurred_on"
@@ -76,7 +77,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_04_095355) do
     t.check_constraint "amount_cents > 0", name: "expenses_amount_cents_positive"
     t.check_constraint "currency::text ~ '^[A-Z]{3}$'::text", name: "expenses_currency_format"
     t.check_constraint "length(TRIM(BOTH FROM title)) > 0", name: "expenses_title_not_blank"
-    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'approved'::character varying::text, 'rejected'::character varying::text, 'reimbursed'::character varying::text, 'archived'::character varying::text])", name: "expenses_status_valid"
+    t.check_constraint "reference_number IS NOT NULL", name: "expenses_reference_number_not_null"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'approved'::character varying, 'rejected'::character varying, 'reimbursed'::character varying, 'archived'::character varying, 'cancelled'::character varying]::text[])", name: "expenses_status_valid"
   end
 
   add_check_constraint "expenses", "approved_by_id IS DISTINCT FROM user_id", name: "expenses_prevent_self_approval", validate: false
@@ -156,6 +158,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_04_095355) do
     t.datetime "updated_at", null: false
     t.index ["expense_id", "reminder_date", "reminder_type"], name: "index_reminders_on_expense_date_and_type", unique: true
     t.index ["expense_id"], name: "index_reminders_on_expense_id"
+    t.check_constraint "reminder_type::text = 'overdue'::text", name: "reminders_type_check"
   end
 
   create_table "users", force: :cascade do |t|

@@ -77,6 +77,20 @@ RSpec.describe Expense do
     expect(expense.amount_decimal).to eq("12.34")
   end
 
+  describe "reference number generation" do
+    it "generates a reference number using the expense ID" do
+      expense = create(:expense)
+
+      expect(expense.reference_number).to eq("EXP-#{expense.id}")
+    end
+
+    it "preserves an explicitly supplied reference number" do
+      expense = create(:expense, reference_number: "CUSTOM-123")
+
+      expect(expense.reference_number).to eq("CUSTOM-123")
+    end
+  end
+
   it "encrypts notes in the database" do
     expense = create(:expense, notes: "Private notes")
 
@@ -129,5 +143,19 @@ RSpec.describe Expense do
       expense.status = :rejected
       expect { expense.archive! }.to raise_error(AASM::InvalidTransition)
     end
+  end
+
+  it "creates exactly one activity log when an expense is created directly" do
+    expense = build(:expense)
+
+    expect {
+      expense.save!
+    }.to change(ActivityLog, :count).by(1)
+
+    log = ActivityLog.find_by!(expense: expense)
+    expect(log.action).to eq("create")
+    expect(log.from_state).to eq("new")
+    expect(log.to_state).to eq("pending")
+    expect(log.actor).to eq(expense.user)
   end
 end

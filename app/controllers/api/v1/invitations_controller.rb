@@ -18,10 +18,6 @@ module Api
           },
           invitation_token: raw_token
         }, status: :created
-      rescue ActiveRecord::RecordInvalid => e
-        render json: {
-          errors: e.record.errors.full_messages
-        }, status: :unprocessable_entity
       end
     end
   end

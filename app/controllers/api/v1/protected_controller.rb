@@ -4,11 +4,11 @@ module Api
       include TenantLoader
 
       def index
-        render json: {
+        render_success(data: {
           message: "Authenticated successfully",
           user_id: @current_user.id,
           role: @current_user.role
-        }, status: :ok
+        })
       end
     end
   end
