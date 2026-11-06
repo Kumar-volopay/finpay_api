@@ -1,16 +1,26 @@
-# Be sure to restart your server when you modify this file.
+# frozen_string_literal: true
 
-# Avoid CORS issues when API is called from the frontend app.
-# Handle Cross-Origin Resource Sharing (CORS) in order to accept cross-origin Ajax requests.
+allowed_origins =
+  if Rails.env.production?
+    ENV.fetch("CORS_ALLOWED_ORIGINS").split(",").map(&:strip).reject(&:empty?)
+  else
+    ENV.fetch("CORS_ALLOWED_ORIGINS", "http://localhost:3000")
+       .split(",")
+       .map(&:strip)
+       .reject(&:empty?)
+  end
 
-# Read more: https://github.com/cyu/rack-cors
+if allowed_origins.empty? || allowed_origins.include?("*")
+  raise "CORS_ALLOWED_ORIGINS must contain explicit origins and cannot use *"
+end
 
-# Rails.application.config.middleware.insert_before 0, Rack::Cors do
-#   allow do
-#     origins "example.com"
-#
-#     resource "*",
-#       headers: :any,
-#       methods: [:get, :post, :put, :patch, :delete, :options, :head]
-#   end
-# end
+Rails.application.config.middleware.insert_before 0, Rack::Cors do
+  allow do
+    origins(*allowed_origins)
+
+    resource "/api/*",
+      headers: %w[Authorization Content-Type Accept X-Request-Id],
+      methods: %i[get post put patch delete options head],
+      max_age: 600
+  end
+end
