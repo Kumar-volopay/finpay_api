@@ -1,0 +1,538 @@
+---
+openapi: 3.0.1
+info:
+  title: FinPay API
+  version: v1
+  description: FinPay API documentation
+servers:
+- url: "/"
+  description: Current server
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+paths:
+  "/api/v1/auth/login":
+    post:
+      summary: Login to FinPay
+      tags:
+      - Authentication
+      parameters: []
+      responses:
+        '200':
+          description: successful login
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  refresh_token:
+                    type: string
+        '401':
+          description: invalid credentials
+        '429':
+          description: login rate limit exceeded
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+                description: Seconds until another login attempt is allowed
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                subdomain:
+                  type: string
+                  example: acme
+                email:
+                  type: string
+                  example: member@example.com
+                password:
+                  type: string
+                  example: TestPass123!
+              required:
+              - subdomain
+              - email
+              - password
+  "/api/v1/auth/register":
+    post:
+      summary: Register using an invitation
+      tags:
+      - Authentication
+      parameters: []
+      responses:
+        '201':
+          description: registration successful
+        '401':
+          description: invalid invitation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                subdomain:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                password_confirmation:
+                  type: string
+                invitation_token:
+                  type: string
+              required:
+              - subdomain
+              - email
+              - password
+              - password_confirmation
+              - invitation_token
+        required: true
+  "/api/v1/auth/logout":
+    delete:
+      summary: Logout and revoke authentication tokens
+      tags:
+      - Authentication
+      security:
+      - BearerAuth: []
+      parameters: []
+      responses:
+        '204':
+          description: successfully logged out
+        '401':
+          description: invalid refresh token
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token:
+                  type: string
+              required:
+              - refresh_token
+        required: true
+  "/api/v1/auth/refresh":
+    post:
+      summary: Refresh authentication tokens
+      tags:
+      - Authentication
+      parameters: []
+      responses:
+        '200':
+          description: tokens successfully refreshed
+        '401':
+          description: invalid refresh token
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                subdomain:
+                  type: string
+                refresh_token:
+                  type: string
+              required:
+              - subdomain
+              - refresh_token
+        required: true
+  "/api/v1/expenses/{id}/approve":
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+    post:
+      summary: Approve an expense
+      tags:
+      - Expense Workflow
+      security:
+      - BearerAuth: []
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: expense approved
+        '401':
+          description: authentication required
+        '403':
+          description: approval not authorized
+  "/api/v1/expenses/{id}/reject":
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+    post:
+      summary: Reject an expense
+      tags:
+      - Expense Workflow
+      security:
+      - BearerAuth: []
+      parameters: []
+      responses:
+        '200':
+          description: expense rejected
+        '422':
+          description: rejection reason required
+        '401':
+          description: authentication required
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  maxLength: 500
+              required:
+              - reason
+  "/api/v1/expenses/{id}/reimburse":
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+    post:
+      summary: Reimburse an approved expense
+      tags:
+      - Expense Workflow
+      security:
+      - BearerAuth: []
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: expense reimbursed
+        '400':
+          description: idempotency key required
+        '422':
+          description: invalid workflow transition
+        '401':
+          description: authentication required
+  "/api/v1/expenses/{id}/archive":
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+    post:
+      summary: Archive a reimbursed expense
+      tags:
+      - Expense Workflow
+      security:
+      - BearerAuth: []
+      responses:
+        '200':
+          description: expense archived
+        '403':
+          description: archive not authorized
+        '401':
+          description: authentication required
+  "/api/v1/expenses":
+    get:
+      summary: List expenses
+      tags:
+      - Expenses
+      security:
+      - BearerAuth: []
+      parameters:
+      - name: category_id
+        in: query
+        required: false
+        description: Filter by category ID
+        minimum: 1
+        schema:
+          type: integer
+      - name: status
+        in: query
+        required: false
+        enum:
+        - pending
+        - approved
+        - rejected
+        description: "Filter by expense status:\n * `pending` \n * `approved` \n *
+          `rejected` \n "
+        schema:
+          type: string
+      - name: from
+        in: query
+        format: date
+        required: false
+        description: Filter expenses incurred on or after this date
+        schema:
+          type: string
+      - name: to
+        in: query
+        format: date
+        required: false
+        description: Filter expenses incurred on or before this date
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        minimum: 1
+        default: 1
+        schema:
+          type: integer
+      - name: per_page
+        in: query
+        required: false
+        minimum: 1
+        maximum: 100
+        default: 20
+        schema:
+          type: integer
+      - name: pagination
+        in: query
+        required: false
+        enum:
+        - offset
+        - cursor
+        default: offset
+        description: Choose offset or cursor pagination
+        schema:
+          type: string
+      - name: cursor
+        in: query
+        required: false
+        description: Cursor returned by the previous cursor-based response
+        schema:
+          type: string
+      responses:
+        '200':
+          description: expenses returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        title:
+                          type: string
+                        amount_cents:
+                          type: integer
+                        amount:
+                          type: number
+                        currency:
+                          type: string
+                        status:
+                          type: string
+                        category_id:
+                          type: integer
+                        user_id:
+                          type: integer
+                  meta:
+                    type: object
+                    properties:
+                      pagination:
+                        type: object
+                        properties:
+                          current_page:
+                            type: integer
+                          per_page:
+                            type: integer
+                          total_count:
+                            type: integer
+                          total_pages:
+                            type: integer
+                          next_cursor:
+                            type: string
+                            nullable: true
+        '401':
+          description: authentication required
+        '422':
+          description: invalid filters or pagination
+    post:
+      summary: Create an expense
+      tags:
+      - Expenses
+      security:
+      - BearerAuth: []
+      parameters: []
+      responses:
+        '201':
+          description: expense created
+        '401':
+          description: authentication required
+        '422':
+          description: validation failed
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expense:
+                  type: object
+                  properties:
+                    title:
+                      type: string
+                    amount_cents:
+                      type: integer
+                    currency:
+                      type: string
+                    category_id:
+                      type: integer
+                    incurred_on:
+                      type: string
+                      format: date
+                    notes:
+                      type: string
+                  required:
+                  - title
+                  - amount_cents
+                  - currency
+                  - category_id
+                  - incurred_on
+              required:
+              - expense
+  "/api/v1/expenses/{id}":
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+    get:
+      summary: Show an expense
+      tags:
+      - Expenses
+      security:
+      - BearerAuth: []
+      responses:
+        '200':
+          description: expense returned
+        '401':
+          description: authentication required
+        '404':
+          description: expense not found
+    patch:
+      summary: Update an expense
+      tags:
+      - Expenses
+      security:
+      - BearerAuth: []
+      parameters: []
+      responses:
+        '200':
+          description: expense updated
+        '401':
+          description: authentication required
+        '404':
+          description: expense not found
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expense:
+                  type: object
+                  properties:
+                    title:
+                      type: string
+                    notes:
+                      type: string
+              required:
+              - expense
+    delete:
+      summary: Cancel an expense
+      tags:
+      - Expenses
+      security:
+      - BearerAuth: []
+      responses:
+        '204':
+          description: expense cancelled
+        '401':
+          description: authentication required
+        '404':
+          description: expense not found
+  "/api/v1/invitations":
+    post:
+      summary: Create an invitation
+      tags:
+      - Invitations
+      security:
+      - BearerAuth: []
+      parameters: []
+      responses:
+        '201':
+          description: invitation created
+        '403':
+          description: admin authorization required
+        '401':
+          description: authentication required
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+              required:
+              - email
+        required: true
+  "/api/v1/protected":
+    get:
+      summary: Check authenticated access
+      tags:
+      - Authentication
+      security:
+      - BearerAuth: []
+      responses:
+        '200':
+          description: authenticated successfully
+        '401':
+          description: authentication required
+  "/api/v1/users/{id}":
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+    get:
+      summary: Show a user
+      tags:
+      - Users
+      security:
+      - BearerAuth: []
+      responses:
+        '200':
+          description: member can view their own profile
+        '404':
+          description: member cannot access another user's profile
+        '401':
+          description: authentication required

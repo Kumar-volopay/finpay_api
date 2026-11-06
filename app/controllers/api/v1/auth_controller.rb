@@ -7,7 +7,6 @@ module Api
       )
       skip_before_action :require_authenticated_user
       skip_after_action :verify_authorized
-      rate_limit to: 10, within: 1.minute, only: %i[login register refresh]
 
       def register
         company = Company.find_by(subdomain: params[:subdomain])

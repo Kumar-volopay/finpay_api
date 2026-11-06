@@ -1,12 +1,9 @@
-
-
-
-
 require "rails_helper"
 
 RSpec.describe "Api::V1::Auth", type: :request do
   before(:each) do
     Rails.cache.clear
+    Rack::Attack.cache.store.clear
   end
 
   let!(:company) do
@@ -285,14 +282,21 @@ expect(response.parsed_body.dig("error", "request_id")).to be_present
   end
 
   describe "rate limiting" do
-    it "blocks login requests after 10 attempts within one minute" do
-      10.times do
+    it "blocks login requests after 5 attempts within one minute" do
+      5.times do
         post "/api/v1/auth/login", params: login_params
       end
 
       post "/api/v1/auth/login", params: login_params
 
       expect(response).to have_http_status(:too_many_requests)
+      expect(response.headers["Retry-After"]).to be_present
+
+      expect(response.parsed_body.dig("error")).to include(
+        "code" => "rate_limit_exceeded",
+        "message" => "Too many requests. Please try again later.",
+        "details" => []
+      )
     end
   end
 end

@@ -67,13 +67,15 @@ group :development, :test do
   gem "dotenv-rails"
 
   gem "bullet"
+
+  gem "rswag-specs"
 end
 
 gem "ros-apartment", "~> 3.4", require: "apartment"
 gem "strong_migrations", "~> 2.8"
 gem "alba", "~> 4.0"
 
-ruby "3.4.12"
+ruby "4.0.7"
 
 gem "devise", "~> 5.0"
 gem "devise-jwt", "~> 0.13.0"
@@ -82,3 +84,9 @@ gem "pundit", "~> 2.5"
 gem "kaminari"
 gem "sidekiq", "~> 8.1"
 gem "sidekiq-cron", "~> 2.4"
+
+gem "rack-attack"
+gem "rack-cors"
+gem "redis"
+gem "rswag-api"
+gem "rswag-ui"

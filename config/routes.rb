@@ -1,6 +1,8 @@
 require "ipaddr"
 
 Rails.application.routes.draw do
+  mount Rswag::Ui::Engine => "/api-docs"
+  mount Rswag::Api::Engine => "/api-docs"
   if Rails.env.production?
     allowed_ips = ENV.fetch("SIDEKIQ_ALLOWED_IPS", "")
                      .split(",")

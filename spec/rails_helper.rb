@@ -39,6 +39,7 @@ RSpec.configure do |config|
   config.before(:each) do
     Sidekiq::Worker.clear_all
     Rails.cache.clear
+    Rack::Attack.cache.store.clear
     Bullet.start_request
   end
 
