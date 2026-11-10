@@ -67,6 +67,8 @@ group :development, :test do
   gem "dotenv-rails"
 
   gem "bullet"
+
+  gem "rswag-specs"
 end
 
 gem "ros-apartment", "~> 3.4", require: "apartment"
@@ -82,3 +84,9 @@ gem "pundit", "~> 2.5"
 gem "kaminari"
 gem "sidekiq", "~> 8.1"
 gem "sidekiq-cron", "~> 2.4"
+
+gem "rack-attack"
+gem "rack-cors"
+gem "redis"
+gem "rswag-api"
+gem "rswag-ui"

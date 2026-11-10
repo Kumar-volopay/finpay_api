@@ -3,6 +3,8 @@ module Api
     class ProtectedController < ApplicationController
       include TenantLoader
 
+      skip_after_action :verify_authorized, only: :index
+
       def index
         render_success(data: {
           message: "Authenticated successfully",
