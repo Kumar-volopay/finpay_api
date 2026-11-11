@@ -56,10 +56,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_11_045334) do
     t.index ["event_key"], name: "index_activity_logs_on_event_key", unique: true
     t.index ["expense_id", "created_at"], name: "index_activity_logs_on_expense_id_and_created_at"
     t.check_constraint "action::text = ANY (ARRAY['create'::character varying, 'approve'::character varying, 'reject'::character varying, 'reimburse'::character varying, 'archive'::character varying]::text[])", name: "activity_logs_action_check"
-    t.check_constraint "from_state::text = ANY (ARRAY['new'::character varying, 'pending'::character varying, 'approved'::character varying, 'rejected'::character varying, 'reimbursed'::character varying, 'archived'::character varying]::text[])", name: "activity_logs_from_state_check"
+    t.check_constraint "from_state::text = ANY (ARRAY['new'::character varying, 'pending'::character varying, 'approved'::character varying, 'rejected'::character varying, 'reimbursed'::character varying, 'archived'::character varying, 'cancelled'::character varying]::text[])", name: "activity_logs_from_state_check"
   end
 
-  add_check_constraint "activity_logs", "to_state::text = ANY (ARRAY['pending'::character varying, 'approved'::character varying, 'rejected'::character varying, 'reimbursed'::character varying, 'archived'::character varying]::text[])", name: "activity_logs_to_state_check", validate: false
+  add_check_constraint "activity_logs", "to_state::text = ANY (ARRAY['pending'::character varying, 'approved'::character varying, 'rejected'::character varying, 'reimbursed'::character varying, 'archived'::character varying, 'cancelled'::character varying]::text[])", name: "activity_logs_to_state_check", validate: false
 
   create_table "categories", force: :cascade do |t|
     t.string "name", null: false
@@ -107,7 +107,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_11_045334) do
     t.check_constraint "currency::text ~ '^[A-Z]{3}$'::text", name: "expenses_currency_format"
     t.check_constraint "length(TRIM(BOTH FROM title)) > 0", name: "expenses_title_not_blank"
     t.check_constraint "reference_number IS NOT NULL", name: "expenses_reference_number_not_null"
-    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'approved'::character varying, 'rejected'::character varying, 'reimbursed'::character varying, 'archived'::character varying]::text[])", name: "expenses_status_valid"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'approved'::character varying, 'rejected'::character varying, 'reimbursed'::character varying, 'archived'::character varying, 'cancelled'::character varying]::text[])", name: "expenses_status_valid"
   end
 
   add_check_constraint "expenses", "approved_by_id IS DISTINCT FROM user_id", name: "expenses_prevent_self_approval", validate: false
