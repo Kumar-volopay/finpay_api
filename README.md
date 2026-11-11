@@ -1,467 +1,293 @@
 # Finpay API
 
-## About the Project
-
-Finpay API is a Ruby on Rails API project that implements PostgreSQL schema-based multi-tenancy using Apartment (`ros-apartment`).
-
-Each company has its own tenant schema, while company records remain in the `public` schema. The API implements authentication using Devise and JWT, tenant binding using verified token claims, refresh-token rotation, and authorization using Pundit policies.
+Finpay API is a Ruby on Rails JSON API for company expense management. It supports company-level data isolation, JWT authentication, role-based authorization, expense workflows, and receipt file uploads with background OCR-status processing.
 
 ## Features
 
-- PostgreSQL database integration
+- Company registration and provisioning with PostgreSQL schema-based multi-tenancy (Apartment).
+- JWT access-token authentication, refresh-token rotation, and token revocation.
+- Tenant-aware request handling: the verified JWT determines the company context.
+- Admin/member authorization with Pundit policies.
+- Expense creation, listing, filtering, pagination, and workflow actions such as approval, cancellation, and reimbursement.
+- Receipt uploads using Active Storage (PDF, JPEG, and PNG; maximum 10 MB).
+- Background receipt processing with Sidekiq. OCR text is currently simulated; this project does not yet integrate a real OCR engine.
+- RSpec tests and CI checks for RuboCop, Brakeman, Bundler Audit, and RSpec.
 
-- Schema-based multi-tenancy using Apartment
+## Tech stack
 
-- Company model with name and subdomain validations
-
-- Company provisioning service with transaction rollback
-
-- Safe tenant switching in application code
-
-- API authentication using Devise and JWT
-
-- Short-lived access tokens with a 15-minute lifetime
-
-- Refresh-token rotation and revocation
-
-- JWT denylist for revoked access tokens
-
-- Tenant binding based on the verified JWT `company_id` claim
-
-- Role-based authorization using Pundit
-
-- Record-level access control for admin and member roles
-
-- Request, model, service, and policy specifications
-
-- Redis integration through Docker Compose
-
-## Technologies Used
-
-- Ruby 4.0.7
-
-- Ruby on Rails (API mode)
-
+- Ruby 3.4.12
+- Ruby on Rails 8.1 (API mode)
 - PostgreSQL
-
-- Redis
-
+- Redis and Sidekiq
 - Apartment (`ros-apartment`)
-
-- Devise
-
-- `devise-jwt`
-
+- Devise and `devise-jwt`
 - Pundit
+- Active Storage
+- RSpec Rails, FactoryBot, Faker, and SimpleCov
+- RuboCop, Brakeman, and Bundler Audit
 
-- RSpec Rails
+## Requirements
 
-- FactoryBot Rails
-
-- Faker
-
-- SimpleCov
-
-- RuboCop
-
-- Brakeman
-
-- Bundler Audit
-
-## Codebase Tour
-
-| Path | Purpose |
-
-|---|---|
-
-| `app/models/` | Active Record models, including `Company`, `User`, `RefreshToken`, and `JwtDenylist` |
-
-| `app/controllers/api/v1/` | API authentication, protected endpoints, and user endpoints |
-
-| `app/controllers/concerns/tenant_loader.rb` | Validates JWT-based tenant context and switches tenant schemas |
-
-| `app/services/` | Business logic, including company provisioning and authentication services |
-
-| `app/policies/` | Pundit policies for authorization |
-
-| `config/initializers/apartment.rb` | Configures schema-based multi-tenancy |
-
-| `config/initializers/devise.rb` | Configures Devise |
-
-| `config/routes.rb` | Defines API endpoints |
-
-| `db/migrate/` | Database migration files |
-
-| `db/schema.rb` | Database schema snapshot |
-
-| `spec/requests/api/` | Authentication and authorization request specifications |
-
-| `spec/models/` | Model specifications |
-
-| `spec/policies/` | Authorization policy specifications |
-
-| `spec/services/` | Authentication service and tenant-switching specifications |
-
-| `compose.yaml` | Local PostgreSQL and Redis services |
-
-| `bin/setup` | Sets up dependencies, Docker services, and the database |
-
-| `config/deploy.yml` | Kamal deployment configuration |
-
-## Ruby Version
-
-The project specifies Ruby `4.0.7` in `.ruby-version`.
-
-Verify your installed Ruby version:
-
-```bash
-
-ruby --version
-
-```
-
-Use the specified Ruby version when setting up the project to maintain consistency across development environments.
-
-## First-Run Setup
-
-### Prerequisites
-
-- Ruby 4.0.7
-
-- Bundler
-
-- Docker Desktop with Docker Compose
+The recommended local setup uses Docker Compose. Install:
 
 - Git
+- Docker Desktop with Docker Compose
+- Postman (optional, for API testing)
 
-### Setup steps
+If you run Rails outside Docker, install the Ruby version specified in `.ruby-version` and Bundler as well.
 
-1. Clone the repository and open a terminal in the project directory.
+## Clone and run the project
 
-2. Run the setup script:
+```bash
+git clone https://github.com/Kumar-volopay/finpay_api.git
+cd finpay_api
+```
+
+1. Create your local environment file if the repository provides an example:
 
    ```bash
-
-   ruby bin/setup --skip-server
-
+   cp .env.example .env
    ```
 
-3. On the first run, if `.env` does not exist, the script copies `.env.example` to `.env` and stops. Open `.env` and set `DATABASE_PASSWORD` to your local development database password.
+   Review `.env.example` and set the required local values in `.env`. Do not commit `.env` or put real secrets in documentation.
 
-4. Run the setup script again:
+2. Build and start the application and its Docker Compose services:
 
    ```bash
-
-   ruby bin/setup --skip-server
-
+   docker compose up -d --build
    ```
 
-5. Verify that PostgreSQL and Redis are running and healthy:
+3. Check that the services are running:
 
    ```bash
-
    docker compose ps
-
    ```
 
-6. If necessary, prepare the database:
+4. Prepare the database:
 
    ```bash
-
-   ruby bin/rails db:prepare
-
+   docker compose exec web ruby bin/rails db:prepare
    ```
 
-7. Run the test suite:
+5. If the project provides development seed data and you want to load it, run:
 
    ```bash
-
-   bundle exec rspec
-
+   docker compose exec web ruby bin/rails db:seed
    ```
 
-To start the Rails server after setup:
+6. Check the Rails application at:
+
+   ```text
+   http://127.0.0.1:3000
+   ```
+
+The API base URL used in the examples below is `http://127.0.0.1:3000`. If your Compose configuration maps the web service to a different host port, use that port instead.
+
+### Useful Docker commands
 
 ```bash
-
-ruby bin/rails server
-
-```
-
-**Environment variables:** Keep `.env` local and never commit it. The `.env.example` file should contain placeholder values only.
-
-## Docker Setup
-
-Docker Compose runs PostgreSQL and Redis for local development.
-
-The local services use the following host ports:
-
-| Service | Host address | Container port |
-
-|---|---|---|
-
-| PostgreSQL | `127.0.0.1:5433` | `5432` |
-
-| Redis | `127.0.0.1:6380` | `6379` |
-
-The services are bound to the local machine rather than all network interfaces. The PostgreSQL development and test configurations connect through port `5433`.
-
-To start the services manually:
-
-```bash
-
-docker compose up -d --wait
-
-```
-
-To inspect their status:
-
-```bash
-
+# View service status
 docker compose ps
 
+# Follow application logs
+docker compose logs -f web
+
+# Follow background worker logs
+docker compose logs -f worker
+
+# Open a Rails console
+docker compose exec web ruby bin/rails console
+
+# Stop the services
+docker compose down
 ```
 
-## Multi-Tenancy Conventions
+## How the application works
 
-The application uses PostgreSQL schema-based multi-tenancy through Apartment.
+### Multi-tenancy
 
-- **Public schema:** Company records and the JWT denylist are stored in the `public` schema.
+The application uses PostgreSQL schema-based multi-tenancy through Apartment:
 
-- **Tenant schemas:** Each company's `subdomain` is used as its tenant schema name.
+- The `public` schema stores company-level records and the JWT denylist.
+- Each company has a tenant schema identified by its subdomain.
+- Tenant-specific records, including users and refresh tokens, are stored in the relevant tenant schema.
+- For protected requests, the application verifies the JWT and derives the tenant from its `company_id` claim. A client-supplied tenant identifier must not override this context.
+- Tenant context is restored after request processing, including when an exception occurs.
 
-- **Tenant-scoped models:** User records and refresh tokens are stored in the corresponding tenant schema.
+### Authentication and authorization
 
-- **Excluded models:** `Company` and `JwtDenylist` are excluded from tenant schemas.
+The API uses Devise and `devise-jwt` for authentication and Pundit for authorization.
 
-- **Tenant discovery:** Apartment obtains tenant names from `Company.pluck(:subdomain)`.
+1. A user registers or logs in through the authentication endpoints.
+2. A successful login returns an access token and refresh token.
+3. Send the access token as a Bearer token on protected requests.
+4. The API verifies the token, resolves the company tenant, and checks that the user belongs to that tenant.
+5. Pundit policies decide whether the user can access or change the requested record.
 
-- **Subdomain validation:** Subdomains must start with a lowercase letter and contain lowercase letters, digits, or underscores. Their length must be between 3 and 31 characters.
+Access tokens are short-lived (configured for 15 minutes). Refresh tokens are rotated and have a configured seven-day lifetime. Revoked access-token identifiers are stored in the public JWT denylist.
 
-- **Reserved names:** PostgreSQL schema names such as `public`, `pg_catalog`, `information_schema`, and `pg_toast` are rejected.
+The application has admin and member roles. Authorization is tenant-scoped and record-level; a member must not be able to access another member's protected records.
 
-- **Read-only attribute:** The `Company` model declares `subdomain` as read-only after persistence.
+## API endpoints
 
-### Tenant-aware development
-
-When implementing features that access company-owned data:
-
-- Ensure database reads and writes execute in the correct tenant context.
-
-- Derive the tenant identifier from the verified JWT, not from a client-supplied tenant header or request parameter.
-
-- Validate that the authenticated user belongs to the selected company.
-
-- Restore the previous tenant context after each request, including when an exception occurs.
-
-- Add tests for tenant isolation and tenant switching.
-
-- Keep company-level records and the JWT denylist in the public schema.
-
-## Authentication and Authorization
-
-### Authentication flow
-
-The API uses Devise and `devise-jwt` for authentication.
-
-1. A user registers or logs in using the authentication endpoints.
-
-2. Login identifies the company and authenticates the user's credentials within that company's tenant schema.
-
-3. A successful login returns an access token containing the authenticated user's identity and `company_id`.
-
-4. Access tokens have a configured lifetime of approximately 15 minutes.
-
-5. Protected requests validate the access token before using its `company_id` to select the tenant schema.
-
-6. The application checks that the user exists within the selected tenant before allowing the request to proceed.
-
-The server must derive tenant context from a verified token claim. Client-provided tenant identifiers must not override the token's tenant context.
-
-### Authentication endpoints
+All API endpoints are under `/api/v1`.
 
 | Method | Endpoint | Purpose |
-
 |---|---|---|
-
 | `POST` | `/api/v1/auth/register` | Register a user |
-
-| `POST` | `/api/v1/auth/login` | Authenticate a user and issue tokens |
-
+| `POST` | `/api/v1/auth/login` | Log in and receive tokens |
 | `DELETE` | `/api/v1/auth/logout` | Revoke the current access token |
-
 | `POST` | `/api/v1/auth/refresh` | Rotate a refresh token |
+| `GET` | `/api/v1/protected` | Example authenticated endpoint |
+| `GET` | `/api/v1/users/:id` | Retrieve a user subject to policy authorization |
+| `POST` | `/api/v1/expenses/:expense_id/receipts` | Upload a receipt for an expense |
+| `GET` | `/api/v1/expenses/:expense_id/receipts/:id` | Retrieve receipt metadata |
 
-| `GET` | `/api/v1/protected` | Example protected endpoint |
+For the complete and current list of expense CRUD and workflow routes, run:
 
-| `GET` | `/api/v1/users/:id` | Retrieve a user subject to authorization |
+```bash
+docker compose exec web ruby bin/rails routes
+```
 
-### Access-token revocation
+## Test the API with Postman
 
-Revoked access-token JTIs are recorded in `public.jwt_denylist`. Protected requests reject tokens that have been revoked.
+You can use Postman or any HTTP client. The following steps describe the end-to-end API testing flow. Use test accounts and tokens generated in your own local environment; never copy real credentials or tokens into the README.
 
-### Refresh tokens
+### 1. Create a Postman environment
 
-Refresh tokens are stored as digests rather than plaintext tokens. The refresh flow checks expiration and revocation, invalidates the previous token during rotation, and issues a replacement token.
+Create an environment named `Finpay Local` and add:
 
-The configured refresh-token lifetime is seven days.
+| Variable | Initial value |
+|---|---|
+| `base_url` | `http://127.0.0.1:3000` |
+| `access_token` | Leave empty until login |
+| `refresh_token` | Leave empty until login |
+| `expense_id` | Leave empty until an expense is created |
+| `receipt_id` | Leave empty until a receipt is uploaded |
 
-### Roles and authorization
+Select this environment before sending requests.
 
-The application defines two user roles:
+### 2. Register or log in
 
-- **Admin:** Can access records permitted by the admin policy within the authenticated tenant.
-
-- **Member:** Can access their own user record, but cannot access another member's record.
-
-Pundit policies enforce authorization at the record level. Authorization should default to denial unless an explicit policy permits the action.
-
-### Authentication and authorization endpoints
-
-Example requests can be tested using Postman or another HTTP client. Use the response token as a Bearer token when calling protected endpoints:
+Send a registration request if you need a new test user:
 
 ```http
-
-Authorization: Bearer YOUR_ACCESS_TOKEN
-
+POST {{base_url}}/api/v1/auth/register
+Content-Type: application/json
 ```
 
-Never commit real access tokens, refresh tokens, credentials, or other secrets.
+Use the registration JSON fields required by the API. Then log in:
 
-## Safe Rails Console Usage
+```http
+POST {{base_url}}/api/v1/auth/login
+Content-Type: application/json
+```
 
-Use the Rails console carefully, particularly when inspecting tenant-specific data.
+Use the company and user credentials configured for your local test data. From the successful login response, copy the access token and refresh token into the `access_token` and `refresh_token` environment variables.
 
-Start the development console:
+### 3. Call protected endpoints
+
+For protected requests, choose **Authorization → Bearer Token** in Postman and set the token to:
+
+```text
+{{access_token}}
+```
+
+Alternatively, add this header:
+
+```http
+Authorization: Bearer {{access_token}}
+```
+
+### 4. Exercise the expense workflow
+
+Use the expense endpoints listed by `rails routes` to create an expense, retrieve/list expenses, and exercise the workflow actions available to the authenticated role. Test with separate admin and member accounts where applicable. Save the created expense ID as `expense_id` for the receipt request below.
+
+Verify tenant isolation by authenticating as a user from a different company and attempting to access the first company's expense. The other company's user should not gain access to that record.
+
+### 5. Upload a receipt
+
+A receipt belongs to an existing expense. In Postman, create this request:
+
+```http
+POST {{base_url}}/api/v1/expenses/{{expense_id}}/receipts
+```
+
+- Select **Body → form-data**.
+- Add a key named `receipt[file]`.
+- Change the key type from **Text** to **File**.
+- Select a PDF, JPEG, or PNG file no larger than 10 MB.
+- Keep Bearer Token authorization enabled.
+
+Do not use a plain `file` key. The controller expects the nested multipart field `receipt[file]`.
+
+A successful upload returns receipt metadata. The initial OCR status is normally `pending`; the Sidekiq worker processes it in the background. Retrieve the receipt metadata with:
+
+```http
+GET {{base_url}}/api/v1/expenses/{{expense_id}}/receipts/{{receipt_id}}
+```
+
+Save the returned receipt ID in `receipt_id`. The worker currently writes simulated OCR text and updates the status; it does not extract text from the uploaded document using a real OCR service.
+
+### 6. Test refresh and logout
+
+- Send the refresh request to `POST {{base_url}}/api/v1/auth/refresh` using the refresh-token request format expected by the API. Save the newly issued tokens because refresh-token rotation invalidates the previous refresh token.
+- Send `DELETE {{base_url}}/api/v1/auth/logout` with the access token to revoke the current token.
+- After logout, verify that the revoked access token can no longer access protected endpoints.
+
+## Run tests and quality checks
+
+Run commands inside the web container so they use the project's Docker environment.
 
 ```bash
+# Full RSpec suite
+docker compose exec web env RAILS_ENV=test bundle exec rspec
 
-ruby bin/rails console
+# One spec file
+docker compose exec web env RAILS_ENV=test bundle exec rspec spec/models/company_spec.rb
 
+# Ruby style checks
+docker compose exec web bundle exec rubocop
+
+# Rails security scan
+docker compose exec web bundle exec brakeman --no-pager
+
+# Dependency vulnerability audit
+docker compose exec web bundle exec bundler-audit check --update
+
+# Rails autoloading check
+docker compose exec web ruby bin/rails zeitwerk:check
 ```
 
-Inspect company records:
+CI runs these checks on pull requests. The RSpec CI job runs with coverage enabled.
 
-```ruby
+## Project structure
 
-Company.pluck(:id, :name, :subdomain)
+| Path | Responsibility |
+|---|---|
+| `app/controllers/api/v1/` | Versioned API endpoints |
+| `app/controllers/concerns/tenant_loader.rb` | JWT validation and tenant switching |
+| `app/models/` | Active Record models and associations |
+| `app/services/` | Business operations and application workflows |
+| `app/policies/` | Pundit authorization rules |
+| `app/serializers/` | API response serialization |
+| `app/workers/` | Sidekiq background jobs |
+| `config/initializers/apartment.rb` | Apartment configuration |
+| `config/routes.rb` | API route definitions |
+| `db/migrate/` | Database migrations |
+| `db/schema.rb` | Current database schema snapshot |
+| `spec/` | RSpec model, request, service, policy, and integration tests |
+| `compose.yaml` | Local application and dependency services |
+| `.github/workflows/ci.yml` | Pull-request CI workflow |
 
-```
+## Security notes
 
-Inspect configured tenant names:
+- Keep `.env`, master keys, database passwords, JWTs, and refresh tokens out of Git.
+- Use placeholder values only in `.env.example` and documentation.
+- Never trust a tenant ID supplied by a request when a verified JWT claim determines the tenant.
+- Keep authorization checks on protected records and test cross-tenant access.
+- Do not run destructive database commands against shared or production environments.
 
-```ruby
+## Deployment
 
-Apartment.tenant_names
-
-```
-
-To inspect tenant-specific records, switch to a known tenant using Apartment's block-based switching API:
-
-```ruby
-
-tenant = Company.first&.subdomain
-
-if tenant
-
-  Apartment::Tenant.switch(tenant) do
-
-    # Read tenant-specific records here.
-
-    # Example: User.limit(10).to_a
-
-  end
-
-end
-
-```
-
-The block-based API restores the previous tenant context when the block finishes, including when an exception occurs.
-
-**Safety guidelines:**
-
-- Prefer read-only queries when inspecting data.
-
-- Avoid destructive database operations in the console.
-
-- Never reset, drop, or delete data in a shared or production environment without explicit authorization.
-
-- Verify the current tenant context before running tenant-specific operations.
-
-## Run Tests
-
-Run the complete RSpec test suite:
-
-```bash
-
-bundle exec rspec
-
-```
-
-Run a specific spec file when debugging:
-
-```bash
-
-bundle exec rspec spec/models/company_spec.rb
-
-```
-
-Authentication and authorization tests are located under `spec/requests/api/`, with model, service, and policy tests in their respective directories.
-
-## Code Quality and Security Checks
-
-Run the project's quality and security checks:
-
-```bash
-
-bundle exec rubocop
-
-bundle exec brakeman
-
-bundle exec bundler-audit check --update
-
-bundle exec rails zeitwerk:check
-
-```
-
-These checks help identify Ruby style issues, potential Rails security vulnerabilities, known vulnerable dependencies, and autoloading problems.
-
-## Deployment Flow
-
-The project uses a Kamal deployment configuration in `config/deploy.yml`.
-
-Before deploying:
-
-1. Verify the target server addresses and container registry.
-
-2. Configure required deployment secrets, including `RAILS_MASTER_KEY`, using the project's deployment secret mechanism.
-
-3. Configure the production database connection and the `FINPAY_API_DATABASE_PASSWORD` environment variable.
-
-4. Verify production database availability, image registry access, and persistent storage configuration.
-
-5. Run the project's tests and security checks.
-
-6. Follow the deployment commands and approval process established by your team.
-
-7. Verify application health and logs after deployment.
-
-The configuration currently contains example-looking values for the server address (`192.168.0.1`) and registry (`localhost:5555`). These must be verified and replaced with the actual deployment infrastructure values before deploying.
-
-Kamal commands are available through the project's `bin/kamal` executable. Do not deploy using unverified server, registry, or secret settings.
-
-## Security Notes
-
-- Never commit `.env`, database passwords, access tokens, or private keys.
-
-- Keep `.env.example` limited to placeholder values.
-
-- Store production secrets through the approved deployment secret mechanism.
-
-- Validate tenant context before reading or modifying company-specific data.
-
-- Never trust tenant identifiers supplied by the client in place of verified JWT claims.
-
-- Apply Pundit authorization to protected record access.
-
-- Keep the JWT denylist in `public` and tenant-specific user and refresh-token data isolated by schema.
+The repository contains a Kamal configuration in `config/deploy.yml`. Its server and registry values must be checked against the actual deployment infrastructure, and production secrets must be configured securely before deployment. Do not deploy using example or unverified infrastructure values.
