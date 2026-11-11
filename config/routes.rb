@@ -37,6 +37,7 @@ Rails.application.routes.draw do
           post :reimburse
           post :archive
         end
+        resources :receipts, only: %i[create show], controller: "receipts"
       end
       post "auth/register", to: "auth#register"
       post "auth/login", to: "auth#login"
